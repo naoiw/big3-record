@@ -18,6 +18,8 @@ function App() {
   const [rows, setRows] = useState<LogRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  /** true: グラフを体重比で表示、false: 重量(kg)で表示 */
+  const [showWeightRatio, setShowWeightRatio] = useState(false);
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
@@ -66,6 +68,47 @@ function App() {
   return (
     <div style={{ padding: "1rem", fontFamily: "sans-serif", maxWidth: 900 }}>
       <h1>精進の記録（BIG3）</h1>
+
+      <div
+        style={{
+          marginBottom: "1rem",
+          display: "flex",
+          alignItems: "center",
+          gap: "0.5rem",
+        }}
+      >
+        <span style={{ fontSize: "0.9rem", color: "#495057" }}>グラフ表示:</span>
+        <button
+          type="button"
+          onClick={() => setShowWeightRatio(false)}
+          style={{
+            padding: "0.35rem 0.75rem",
+            fontSize: "0.875rem",
+            border: "1px solid #dee2e6",
+            borderRadius: 6,
+            background: showWeightRatio ? "#fff" : "#e9ecef",
+            fontWeight: showWeightRatio ? 400 : 600,
+            cursor: "pointer",
+          }}
+        >
+          重量 (kg)
+        </button>
+        <button
+          type="button"
+          onClick={() => setShowWeightRatio(true)}
+          style={{
+            padding: "0.35rem 0.75rem",
+            fontSize: "0.875rem",
+            border: "1px solid #dee2e6",
+            borderRadius: 6,
+            background: showWeightRatio ? "#e9ecef" : "#fff",
+            fontWeight: showWeightRatio ? 600 : 400,
+            cursor: "pointer",
+          }}
+        >
+          体重比
+        </button>
+      </div>
 
       {latestRow && (
         <section
@@ -126,6 +169,7 @@ function App() {
         dataKey="total"
         data={rows}
         color="#27ae60"
+        weightRatio={showWeightRatio}
       />
       <ChartCard
         title="BP（ベンチプレス）"
@@ -133,6 +177,7 @@ function App() {
         dataKey="bp"
         data={rows}
         color="#e74c3c"
+        weightRatio={showWeightRatio}
       />
       <ChartCard
         title="SQ（スクワット）"
@@ -140,6 +185,7 @@ function App() {
         dataKey="sq"
         data={rows}
         color="#3498db"
+        weightRatio={showWeightRatio}
       />
       <ChartCard
         title="DL（デッドリフト）"
@@ -147,6 +193,7 @@ function App() {
         dataKey="dl"
         data={rows}
         color="#9b59b6"
+        weightRatio={showWeightRatio}
       />
       <ChartCard
         title="Body Weight（体重）"
