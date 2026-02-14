@@ -207,6 +207,67 @@ function App() {
               </div>
             </div>
           </div>
+
+          {/* Totalに占めるBP/SQ/DLの割合（長方形で表現） */}
+          {bestStats.total != null &&
+            bestStats.total > 0 &&
+            bestStats.maxBP != null &&
+            bestStats.maxSQ != null &&
+            bestStats.maxDL != null && (
+              <div style={{ marginTop: "1.25rem", paddingTop: "1rem", borderTop: "1px solid #e9ecef" }}>
+                <div style={{ fontSize: "0.8rem", color: "#6c757d", marginBottom: "0.5rem" }}>
+                  Totalに占める割合
+                </div>
+                <div
+                  style={{
+                    display: "flex",
+                    width: "100%",
+                    height: 28,
+                    borderRadius: 6,
+                    overflow: "hidden",
+                    border: "1px solid #dee2e6",
+                  }}
+                >
+                  <div
+                    style={{
+                      width: `${(bestStats.maxBP / bestStats.total) * 100}%`,
+                      minWidth: 0,
+                      background: "#e74c3c",
+                    }}
+                    title={`BP ${((bestStats.maxBP / bestStats.total) * 100).toFixed(1)}%`}
+                  />
+                  <div
+                    style={{
+                      width: `${(bestStats.maxSQ / bestStats.total) * 100}%`,
+                      minWidth: 0,
+                      background: "#3498db",
+                    }}
+                    title={`SQ ${((bestStats.maxSQ / bestStats.total) * 100).toFixed(1)}%`}
+                  />
+                  <div
+                    style={{
+                      width: `${(bestStats.maxDL / bestStats.total) * 100}%`,
+                      minWidth: 0,
+                      background: "#9b59b6",
+                    }}
+                    title={`DL ${((bestStats.maxDL / bestStats.total) * 100).toFixed(1)}%`}
+                  />
+                </div>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    marginTop: "0.35rem",
+                    fontSize: "0.7rem",
+                    color: "#6c757d",
+                  }}
+                >
+                  <span>BP {((bestStats.maxBP / bestStats.total) * 100).toFixed(1)}%</span>
+                  <span>SQ {((bestStats.maxSQ / bestStats.total) * 100).toFixed(1)}%</span>
+                  <span>DL {((bestStats.maxDL / bestStats.total) * 100).toFixed(1)}%</span>
+                </div>
+              </div>
+            )}
         </section>
       )}
 
