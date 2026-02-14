@@ -41,6 +41,19 @@ function App() {
 
   const latestRow = useMemo(() => getLatestRow(rows), [rows]);
 
+  /** 最新の体重（タイムスタンプが最も新しい行の体重。無ければその時点で有効な最も新しい体重） */
+  const latestBodyWeight = useMemo(() => {
+    const withDate = rows
+      .map((row) => ({ row, date: parseTimestamp(row.timestamp) }))
+      .filter((x): x is { row: LogRow; date: Date } => x.date != null);
+    withDate.sort((a, b) => b.date.getTime() - a.date.getTime());
+    for (const { row } of withDate) {
+      const bw = row.bodyWeight;
+      if (bw != null && Number.isFinite(bw) && bw > 0) return bw;
+    }
+    return null;
+  }, [rows]);
+
   /** 全期間の最高値（BP/SQ/DL）と Total (BIG3) = 3種目合計 */
   const bestStats = useMemo(() => {
     const nums = (key: "bp" | "sq" | "dl") =>
@@ -57,38 +70,31 @@ function App() {
     return { maxBP, maxSQ, maxDL, total };
   }, [rows]);
 
-  /** 全期間の最高体重比（各種目・Total の 値÷体重 の最大値） */
+  /** 自己ベストの体重比：分子＝各種目の最大値(kg)、分母＝最新の体重 */
   const bestStatsRatios = useMemo(() => {
-    const ratios: { bp: number[]; sq: number[]; dl: number[]; total: number[] } = {
-      bp: [],
-      sq: [],
-      dl: [],
-      total: [],
-    };
-    for (const r of rows) {
-      const bw = r.bodyWeight;
-      if (bw == null || !Number.isFinite(bw) || bw <= 0) continue;
-      if (r.bp != null && Number.isFinite(r.bp)) ratios.bp.push(r.bp / bw);
-      if (r.sq != null && Number.isFinite(r.sq)) ratios.sq.push(r.sq / bw);
-      if (r.dl != null && Number.isFinite(r.dl)) ratios.dl.push(r.dl / bw);
-      if (
-        r.bp != null &&
-        r.sq != null &&
-        r.dl != null &&
-        Number.isFinite(r.bp + r.sq + r.dl)
-      ) {
-        ratios.total.push((r.bp + r.sq + r.dl) / bw);
-      }
+    if (latestBodyWeight == null || latestBodyWeight <= 0) {
+      return { maxBP: null, maxSQ: null, maxDL: null, total: null };
     }
     const round2 = (n: number) => Math.round(n * 100) / 100;
     return {
-      maxBP: ratios.bp.length ? round2(Math.max(...ratios.bp)) : null,
-      maxSQ: ratios.sq.length ? round2(Math.max(...ratios.sq)) : null,
-      maxDL: ratios.dl.length ? round2(Math.max(...ratios.dl)) : null,
+      maxBP:
+        bestStats.maxBP != null
+          ? round2(bestStats.maxBP / latestBodyWeight)
+          : null,
+      maxSQ:
+        bestStats.maxSQ != null
+          ? round2(bestStats.maxSQ / latestBodyWeight)
+          : null,
+      maxDL:
+        bestStats.maxDL != null
+          ? round2(bestStats.maxDL / latestBodyWeight)
+          : null,
       total:
-        ratios.total.length ? round2(Math.max(...ratios.total)) : null,
+        bestStats.total != null
+          ? round2(bestStats.total / latestBodyWeight)
+          : null,
     };
-  }, [rows]);
+  }, [rows, bestStats, latestBodyWeight]);
 
   if (loading) return <p>読み込み中…</p>;
   if (error) return <p>エラー: {error}</p>;
