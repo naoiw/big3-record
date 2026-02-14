@@ -120,8 +120,6 @@ function App() {
         </section>
       )}
 
-      <p>取得件数: {rows.length} 件</p>
-
       <ChartCard
         title="Total (BIG3)"
         unit="kg"
