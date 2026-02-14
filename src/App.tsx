@@ -162,6 +162,13 @@ function App() {
       </div>
 
       <ChartCard
+        title="Total (BIG3)"
+        unit="kg"
+        dataKey="total"
+        data={filteredRows}
+        color="#27ae60"
+      />
+      <ChartCard
         title="BP（ベンチプレス）"
         unit="kg"
         dataKey="bp"
