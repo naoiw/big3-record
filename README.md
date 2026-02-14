@@ -1,28 +1,38 @@
 # big3-record
 
-[SwitchBot CO2センサー（温湿度計）](https://www.switchbot.jp/products/switchbot-co2-meter) のデータを Google スプレッドシート経由で取得し、Web でグラフ表示するアプリです。部屋の温度・湿度・不快指数・CO2 を折れ線グラフで確認できます。
+BIG3（ベンチプレス・スクワット・デッドリフト）の記録を Google スプレッドシートから取得し、Web でグラフ表示するアプリです。自己ベストと種目ごとの推移を折れ線グラフで確認できます。
 
 ## アーキテクチャ
 
 ```mermaid
 sequenceDiagram
-  participant API as SwitchBot API
-  participant GAS as Apps Script
-  participant Sheet as スプレッドシート log
+  participant Sheet as スプレッドシート
   participant Front as フロント Web
-  GAS->>API: 温湿度・CO2 取得（5分間隔）
-  GAS->>Sheet: 追記（約1週間分保持）
   Front->>Sheet: gviz JSON で取得
-  Front->>Front: グラフ表示
+  Front->>Front: 自己ベスト算出・グラフ表示
 ```
 
-- Apps Script が 5 分間隔で SwitchBot API から温湿度・CO2 を取得し、スプレッドシートの `log` シートに追記する（約 1 週間分を保持）。
-- フロントはそのシートを gviz（JSON）で取得し、React でグラフを表示する。
+- フロントは Google スプレッドシートを gviz（JSON）で取得し、React で自己ベストと折れ線グラフを表示する。
+- スプレッドシートへの記録は手動入力や Google Apps Script など任意の方法で行う。
+
+## スプレッドシート形式
+
+| 列 | 内容 |
+|---|---|
+| A | 日付（タイムスタンプ） |
+| B | BP（ベンチプレス）kg |
+| C | SQ（スクワット）kg |
+| D | DL（デッドリフト）kg |
+| E | Body Weight（体重）kg |
+
+- 1 行目はヘッダ、2 行目以降がデータ。空セルは未記録として扱う。
+- 日付は UNIX 秒・ISO 文字列・`YYYY/MM/DD` 形式などに対応。
 
 ## 主な機能
 
-- **折れ線グラフ**: 温度・湿度・不快指数・CO2 の 4 種類を表示
-- **表示範囲**: 1 時間 / 12 時間 / 1 日 / 1 週間で切り替え可能
+- **自己ベスト表示**: BP・SQ・DL の各最大値と Total（BIG3 合計）を表示。表示日付付き。
+- **折れ線グラフ**: Total（BIG3）・BP・SQ・DL・Body Weight の 5 種類を Recharts で表示。
+- **補完**: グラフ描画時、BP/SQ/DL の空欄は「それ以前で最も新しい値」で補完し、Total は 3 種目から自動計算。
 
 ## 技術スタック
 
@@ -42,7 +52,3 @@ pnpm build
 ```
 
 - `main` ブランチへ push すると、GitHub Actions でビルドされ GitHub Pages に自動デプロイされます。
-
-## データの記録（GAS）
-
-スプレッドシートへの記録は Google Apps Script で行います。設定・トリガー・シート形式などは [apps_script/README.md](apps_script/README.md) を参照してください。
