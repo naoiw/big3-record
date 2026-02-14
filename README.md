@@ -1,4 +1,4 @@
-# switchbot-logger
+# big3-record
 
 [SwitchBot CO2センサー（温湿度計）](https://www.switchbot.jp/products/switchbot-co2-meter) のデータを Google スプレッドシート経由で取得し、Web でグラフ表示するアプリです。部屋の温度・湿度・不快指数・CO2 を折れ線グラフで確認できます。
 
