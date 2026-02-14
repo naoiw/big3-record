@@ -1,13 +1,3 @@
-/** 横軸の範囲オプション（表示するデータ件数＝日次記録の件数） */
-export const TIME_RANGES = [
-  { label: "7日", count: 7 },
-  { label: "30日", count: 30 },
-  { label: "90日", count: 90 },
-  { label: "1年", count: 365 },
-] as const;
-
-export type TimeRangeKey = (typeof TIME_RANGES)[number]["label"];
-
 /**
  * スプレッドシートのタイムスタンプ文字列を Date にパースする。
  * UNIX秒（数値文字列）・ISO・"YYYY/MM/DD" 形式に対応。パースできない場合は null。
@@ -29,20 +19,4 @@ export function parseTimestamp(ts: string): Date | null {
   // "YYYY/MM/DD HH:MM" など
   d = new Date(trimmed.replace(/\//g, "-"));
   return Number.isNaN(d.getTime()) ? null : d;
-}
-
-/**
- * タイムスタンプで昇順ソートし、最新の count 件だけに絞る。
- * タイムスタンプがパースできない行は除外する。
- */
-export function filterRowsByCount<T extends { timestamp: string }>(
-  rows: T[],
-  count: number
-): T[] {
-  const withDate = rows
-    .map((row) => ({ row, date: parseTimestamp(row.timestamp) }))
-    .filter((x): x is { row: T; date: Date } => x.date != null);
-  if (withDate.length === 0) return [];
-  withDate.sort((a, b) => a.date.getTime() - b.date.getTime());
-  return withDate.slice(-count).map((x) => x.row);
 }
