@@ -222,7 +222,7 @@ function App() {
                   style={{
                     display: "flex",
                     width: "100%",
-                    height: 28,
+                    height: 44,
                     borderRadius: 6,
                     overflow: "hidden",
                     border: "1px solid #dee2e6",
@@ -233,38 +233,52 @@ function App() {
                       width: `${(bestStats.maxBP / bestStats.total) * 100}%`,
                       minWidth: 0,
                       background: "#e74c3c",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      color: "#fff",
+                      fontWeight: 600,
+                      fontSize: "1.1rem",
+                      overflow: "hidden",
                     }}
                     title={`BP ${((bestStats.maxBP / bestStats.total) * 100).toFixed(1)}%`}
-                  />
+                  >
+                    BP {((bestStats.maxBP / bestStats.total) * 100).toFixed(1)}%
+                  </div>
                   <div
                     style={{
                       width: `${(bestStats.maxSQ / bestStats.total) * 100}%`,
                       minWidth: 0,
                       background: "#3498db",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      color: "#fff",
+                      fontWeight: 600,
+                      fontSize: "1.1rem",
+                      overflow: "hidden",
                     }}
                     title={`SQ ${((bestStats.maxSQ / bestStats.total) * 100).toFixed(1)}%`}
-                  />
+                  >
+                    SQ {((bestStats.maxSQ / bestStats.total) * 100).toFixed(1)}%
+                  </div>
                   <div
                     style={{
                       width: `${(bestStats.maxDL / bestStats.total) * 100}%`,
                       minWidth: 0,
                       background: "#9b59b6",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      color: "#fff",
+                      fontWeight: 600,
+                      fontSize: "1.1rem",
+                      overflow: "hidden",
                     }}
                     title={`DL ${((bestStats.maxDL / bestStats.total) * 100).toFixed(1)}%`}
-                  />
-                </div>
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    marginTop: "0.35rem",
-                    fontSize: "0.7rem",
-                    color: "#6c757d",
-                  }}
-                >
-                  <span>BP {((bestStats.maxBP / bestStats.total) * 100).toFixed(1)}%</span>
-                  <span>SQ {((bestStats.maxSQ / bestStats.total) * 100).toFixed(1)}%</span>
-                  <span>DL {((bestStats.maxDL / bestStats.total) * 100).toFixed(1)}%</span>
+                  >
+                    DL {((bestStats.maxDL / bestStats.total) * 100).toFixed(1)}%
+                  </div>
                 </div>
               </div>
             )}
