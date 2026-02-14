@@ -57,12 +57,45 @@ function App() {
     return { maxBP, maxSQ, maxDL, total };
   }, [rows]);
 
+  /** 全期間の最高体重比（各種目・Total の 値÷体重 の最大値） */
+  const bestStatsRatios = useMemo(() => {
+    const ratios: { bp: number[]; sq: number[]; dl: number[]; total: number[] } = {
+      bp: [],
+      sq: [],
+      dl: [],
+      total: [],
+    };
+    for (const r of rows) {
+      const bw = r.bodyWeight;
+      if (bw == null || !Number.isFinite(bw) || bw <= 0) continue;
+      if (r.bp != null && Number.isFinite(r.bp)) ratios.bp.push(r.bp / bw);
+      if (r.sq != null && Number.isFinite(r.sq)) ratios.sq.push(r.sq / bw);
+      if (r.dl != null && Number.isFinite(r.dl)) ratios.dl.push(r.dl / bw);
+      if (
+        r.bp != null &&
+        r.sq != null &&
+        r.dl != null &&
+        Number.isFinite(r.bp + r.sq + r.dl)
+      ) {
+        ratios.total.push((r.bp + r.sq + r.dl) / bw);
+      }
+    }
+    const round2 = (n: number) => Math.round(n * 100) / 100;
+    return {
+      maxBP: ratios.bp.length ? round2(Math.max(...ratios.bp)) : null,
+      maxSQ: ratios.sq.length ? round2(Math.max(...ratios.sq)) : null,
+      maxDL: ratios.dl.length ? round2(Math.max(...ratios.dl)) : null,
+      total:
+        ratios.total.length ? round2(Math.max(...ratios.total)) : null,
+    };
+  }, [rows]);
+
   if (loading) return <p>読み込み中…</p>;
   if (error) return <p>エラー: {error}</p>;
 
-  const formatValue = (v: number | null, unit: string) =>
+  const formatValue = (v: number | null, unit: string, decimals = 1) =>
     v != null && Number.isFinite(v)
-      ? unit ? `${v.toFixed(1)} ${unit}` : v.toFixed(1)
+      ? unit ? `${v.toFixed(decimals)} ${unit}` : v.toFixed(decimals)
       : "—";
 
   return (
@@ -138,25 +171,33 @@ function App() {
             <div>
               <span style={{ fontSize: "0.8rem", color: "#6c757d" }}>BP（ベンチプレス）</span>
               <div style={{ fontSize: "1.25rem", fontWeight: 600, color: "#e74c3c" }}>
-                {formatValue(bestStats.maxBP, "kg")}
+                {showWeightRatio
+                  ? formatValue(bestStatsRatios.maxBP, "倍", 2)
+                  : formatValue(bestStats.maxBP, "kg")}
               </div>
             </div>
             <div>
               <span style={{ fontSize: "0.8rem", color: "#6c757d" }}>SQ（スクワット）</span>
               <div style={{ fontSize: "1.25rem", fontWeight: 600, color: "#3498db" }}>
-                {formatValue(bestStats.maxSQ, "kg")}
+                {showWeightRatio
+                  ? formatValue(bestStatsRatios.maxSQ, "倍", 2)
+                  : formatValue(bestStats.maxSQ, "kg")}
               </div>
             </div>
             <div>
               <span style={{ fontSize: "0.8rem", color: "#6c757d" }}>DL（デッドリフト）</span>
               <div style={{ fontSize: "1.25rem", fontWeight: 600, color: "#9b59b6" }}>
-                {formatValue(bestStats.maxDL, "kg")}
+                {showWeightRatio
+                  ? formatValue(bestStatsRatios.maxDL, "倍", 2)
+                  : formatValue(bestStats.maxDL, "kg")}
               </div>
             </div>
             <div>
               <span style={{ fontSize: "0.8rem", color: "#6c757d" }}>Total (BIG3)</span>
               <div style={{ fontSize: "1.25rem", fontWeight: 600, color: "#27ae60" }}>
-                {formatValue(bestStats.total, "kg")}
+                {showWeightRatio
+                  ? formatValue(bestStatsRatios.total, "倍", 2)
+                  : formatValue(bestStats.total, "kg")}
               </div>
             </div>
           </div>
