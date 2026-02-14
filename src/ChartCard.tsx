@@ -22,6 +22,9 @@ const Y_PADDING_BY_KEY: Record<NumericDataKey, number> = {
   bodyWeight: 1,
 };
 
+/** 体重比モード時の縦軸余白（倍率なので小さめ） */
+const Y_PADDING_RATIO = 0.05;
+
 type NumericDataKey = "total" | "bp" | "sq" | "dl" | "bodyWeight";
 
 function getDomainWithPadding(values: number[], padding: number): [number, number] {
@@ -38,6 +41,8 @@ interface ChartCardProps {
   dataKey: NumericDataKey;
   data: LogRow[];
   color: string;
+  /** true のとき BP/SQ/DL/Total を体重比（値÷体重）で表示。bodyWeight は対象外。 */
+  weightRatio?: boolean;
 }
 
 /** セル値を数値に統一（空文字・無効は null） */
@@ -73,15 +78,23 @@ function sortAndFillBpSqDl(rows: LogRow[]): LogRow[] {
   });
 }
 
+const RATIO_KEYS = ["total", "bp", "sq", "dl"] as const;
+
 export function ChartCard({
   title,
   unit,
   dataKey,
   data,
   color,
+  weightRatio = false,
 }: ChartCardProps) {
   // 古い→新しいでソートし、BP/SQ/DL の空欄を直前の有効値で補完
   const filledRows = sortAndFillBpSqDl(data);
+
+  const useRatio =
+    weightRatio &&
+    (RATIO_KEYS as readonly string[]).includes(dataKey) &&
+    dataKey !== "bodyWeight";
 
   const chartData = filledRows.map((row) => {
     const bp = row.bp != null && Number.isFinite(row.bp) ? row.bp : null;
@@ -92,7 +105,7 @@ export function ChartCard({
         ? Math.round((bp + sq + dl) * 10) / 10
         : null;
     const bodyWeight = toNum(row.bodyWeight);
-    return {
+    const base: Record<string, unknown> = {
       ...row,
       bp,
       sq,
@@ -100,17 +113,32 @@ export function ChartCard({
       total,
       bodyWeight,
     };
+    if (useRatio && bodyWeight != null && bodyWeight > 0) {
+      const raw = base[dataKey];
+      if (raw != null && Number.isFinite(raw)) {
+        (base as Record<string, number>)[`${dataKey}Ratio`] =
+          Math.round((Number(raw) / bodyWeight) * 100) / 100;
+      } else {
+        (base as Record<string, number | null>)[`${dataKey}Ratio`] = null;
+      }
+    }
+    return base;
   });
 
+  const displayKey = useRatio ? `${dataKey}Ratio` : dataKey;
   const values = chartData
-    .map((d) => d[dataKey])
+    .map((d) => d[displayKey])
     .filter((v): v is number => v != null && Number.isFinite(v));
-  const domain = getDomainWithPadding(values, Y_PADDING_BY_KEY[dataKey]);
+  const padding = useRatio ? Y_PADDING_RATIO : Y_PADDING_BY_KEY[dataKey];
+  const domain = getDomainWithPadding(values, padding);
+
+  const displayTitle = useRatio ? `${title}（体重比）` : title;
+  const displayUnit = useRatio ? "倍" : unit;
 
   return (
     <div style={{ marginBottom: "2rem" }}>
       <h2 style={{ marginBottom: "0.5rem", fontSize: "1.1rem" }}>
-        {title} ({unit})
+        {displayTitle} ({displayUnit})
       </h2>
       <div style={{ width: "100%", height: 220 }}>
         <ResponsiveContainer width="100%" height="100%">
@@ -140,11 +168,11 @@ export function ChartCard({
               tickFormatter={(v) => {
                 const n = Number(v);
                 if (!Number.isFinite(n)) return String(v);
-                return n.toFixed(1);
+                return useRatio ? n.toFixed(2) : n.toFixed(1);
               }}
             />
             <Tooltip
-              formatter={(value: number) => [value, title]}
+              formatter={(value: number) => [value, displayTitle]}
               labelFormatter={(label) =>
                 new Date(label).toLocaleDateString("ja-JP", {
                   year: "numeric",
@@ -155,7 +183,7 @@ export function ChartCard({
             />
             <Line
               type="monotone"
-              dataKey={dataKey}
+              dataKey={displayKey}
               stroke={color}
               strokeWidth={2}
               dot={false}

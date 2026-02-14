@@ -18,6 +18,8 @@ function App() {
   const [rows, setRows] = useState<LogRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  /** true: グラフを体重比で表示、false: 重量(kg)で表示 */
+  const [showWeightRatio, setShowWeightRatio] = useState(false);
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
@@ -39,6 +41,19 @@ function App() {
 
   const latestRow = useMemo(() => getLatestRow(rows), [rows]);
 
+  /** 最新の体重（タイムスタンプが最も新しい行の体重。無ければその時点で有効な最も新しい体重） */
+  const latestBodyWeight = useMemo(() => {
+    const withDate = rows
+      .map((row) => ({ row, date: parseTimestamp(row.timestamp) }))
+      .filter((x): x is { row: LogRow; date: Date } => x.date != null);
+    withDate.sort((a, b) => b.date.getTime() - a.date.getTime());
+    for (const { row } of withDate) {
+      const bw = row.bodyWeight;
+      if (bw != null && Number.isFinite(bw) && bw > 0) return bw;
+    }
+    return null;
+  }, [rows]);
+
   /** 全期間の最高値（BP/SQ/DL）と Total (BIG3) = 3種目合計 */
   const bestStats = useMemo(() => {
     const nums = (key: "bp" | "sq" | "dl") =>
@@ -55,17 +70,84 @@ function App() {
     return { maxBP, maxSQ, maxDL, total };
   }, [rows]);
 
+  /** 自己ベストの体重比：分子＝各種目の最大値(kg)、分母＝最新の体重 */
+  const bestStatsRatios = useMemo(() => {
+    if (latestBodyWeight == null || latestBodyWeight <= 0) {
+      return { maxBP: null, maxSQ: null, maxDL: null, total: null };
+    }
+    const round2 = (n: number) => Math.round(n * 100) / 100;
+    return {
+      maxBP:
+        bestStats.maxBP != null
+          ? round2(bestStats.maxBP / latestBodyWeight)
+          : null,
+      maxSQ:
+        bestStats.maxSQ != null
+          ? round2(bestStats.maxSQ / latestBodyWeight)
+          : null,
+      maxDL:
+        bestStats.maxDL != null
+          ? round2(bestStats.maxDL / latestBodyWeight)
+          : null,
+      total:
+        bestStats.total != null
+          ? round2(bestStats.total / latestBodyWeight)
+          : null,
+    };
+  }, [rows, bestStats, latestBodyWeight]);
+
   if (loading) return <p>読み込み中…</p>;
   if (error) return <p>エラー: {error}</p>;
 
-  const formatValue = (v: number | null, unit: string) =>
+  const formatValue = (v: number | null, unit: string, decimals = 1) =>
     v != null && Number.isFinite(v)
-      ? unit ? `${v.toFixed(1)} ${unit}` : v.toFixed(1)
+      ? unit ? `${v.toFixed(decimals)} ${unit}` : v.toFixed(decimals)
       : "—";
 
   return (
     <div style={{ padding: "1rem", fontFamily: "sans-serif", maxWidth: 900 }}>
       <h1>精進の記録（BIG3）</h1>
+
+      <div
+        style={{
+          marginBottom: "1rem",
+          display: "flex",
+          alignItems: "center",
+          gap: "0.5rem",
+        }}
+      >
+        <span style={{ fontSize: "0.9rem", color: "#495057" }}>グラフ表示:</span>
+        <button
+          type="button"
+          onClick={() => setShowWeightRatio(false)}
+          style={{
+            padding: "0.35rem 0.75rem",
+            fontSize: "0.875rem",
+            border: "1px solid #dee2e6",
+            borderRadius: 6,
+            background: showWeightRatio ? "#fff" : "#e9ecef",
+            fontWeight: showWeightRatio ? 400 : 600,
+            cursor: "pointer",
+          }}
+        >
+          重量 (kg)
+        </button>
+        <button
+          type="button"
+          onClick={() => setShowWeightRatio(true)}
+          style={{
+            padding: "0.35rem 0.75rem",
+            fontSize: "0.875rem",
+            border: "1px solid #dee2e6",
+            borderRadius: 6,
+            background: showWeightRatio ? "#e9ecef" : "#fff",
+            fontWeight: showWeightRatio ? 600 : 400,
+            cursor: "pointer",
+          }}
+        >
+          体重比
+        </button>
+      </div>
 
       {latestRow && (
         <section
@@ -95,25 +177,33 @@ function App() {
             <div>
               <span style={{ fontSize: "0.8rem", color: "#6c757d" }}>BP（ベンチプレス）</span>
               <div style={{ fontSize: "1.25rem", fontWeight: 600, color: "#e74c3c" }}>
-                {formatValue(bestStats.maxBP, "kg")}
+                {showWeightRatio
+                  ? formatValue(bestStatsRatios.maxBP, "倍", 2)
+                  : formatValue(bestStats.maxBP, "kg")}
               </div>
             </div>
             <div>
               <span style={{ fontSize: "0.8rem", color: "#6c757d" }}>SQ（スクワット）</span>
               <div style={{ fontSize: "1.25rem", fontWeight: 600, color: "#3498db" }}>
-                {formatValue(bestStats.maxSQ, "kg")}
+                {showWeightRatio
+                  ? formatValue(bestStatsRatios.maxSQ, "倍", 2)
+                  : formatValue(bestStats.maxSQ, "kg")}
               </div>
             </div>
             <div>
               <span style={{ fontSize: "0.8rem", color: "#6c757d" }}>DL（デッドリフト）</span>
               <div style={{ fontSize: "1.25rem", fontWeight: 600, color: "#9b59b6" }}>
-                {formatValue(bestStats.maxDL, "kg")}
+                {showWeightRatio
+                  ? formatValue(bestStatsRatios.maxDL, "倍", 2)
+                  : formatValue(bestStats.maxDL, "kg")}
               </div>
             </div>
             <div>
               <span style={{ fontSize: "0.8rem", color: "#6c757d" }}>Total (BIG3)</span>
               <div style={{ fontSize: "1.25rem", fontWeight: 600, color: "#27ae60" }}>
-                {formatValue(bestStats.total, "kg")}
+                {showWeightRatio
+                  ? formatValue(bestStatsRatios.total, "倍", 2)
+                  : formatValue(bestStats.total, "kg")}
               </div>
             </div>
           </div>
@@ -126,6 +216,7 @@ function App() {
         dataKey="total"
         data={rows}
         color="#27ae60"
+        weightRatio={showWeightRatio}
       />
       <ChartCard
         title="BP（ベンチプレス）"
@@ -133,6 +224,7 @@ function App() {
         dataKey="bp"
         data={rows}
         color="#e74c3c"
+        weightRatio={showWeightRatio}
       />
       <ChartCard
         title="SQ（スクワット）"
@@ -140,6 +232,7 @@ function App() {
         dataKey="sq"
         data={rows}
         color="#3498db"
+        weightRatio={showWeightRatio}
       />
       <ChartCard
         title="DL（デッドリフト）"
@@ -147,6 +240,7 @@ function App() {
         dataKey="dl"
         data={rows}
         color="#9b59b6"
+        weightRatio={showWeightRatio}
       />
       <ChartCard
         title="Body Weight（体重）"
