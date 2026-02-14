@@ -9,6 +9,7 @@ sequenceDiagram
   participant User as ユーザー
   participant Sheet as スプレッドシート
   participant Front as フロント Web
+  User->>User: トレーニング
   User->>Sheet: データ記入
   Front->>Sheet: gviz JSON で取得
   Front->>Front: 自己ベスト算出・グラフ表示
