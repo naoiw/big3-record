@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { ChartCard } from "./ChartCard";
-import { fetchTrainingData, type TrainingData } from "./sheetApi";
+import { fetchTrainingData, SPREADSHEET_ID, type TrainingData } from "./sheetApi";
 import {
   filterByRange, prepareTraining, toBodyWeightRatio,
   type HistoryRange, type LiftKey,
@@ -77,7 +77,8 @@ function App() {
           <div className="hero-aside">
             <span className="eyebrow">LATEST ENTRY</span>
             <strong>{formatDay(summary.latestDate)}</strong>
-            <small>Google Sheets の記録から表示</small>
+            <small><a href={`https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/edit`}
+              target="_blank" rel="noopener noreferrer">Google Sheets の記録から表示</a></small>
           </div>
         </section>
 
