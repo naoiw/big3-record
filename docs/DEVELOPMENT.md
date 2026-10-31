@@ -58,6 +58,6 @@ git push origin develop
 
 ## CI
 
-`validate-develop.yml`はdevelop pushまたはmain/develop向けPRでビルドを実行します。`deploy_pages.yml`はmain側で起動し、mainと検証済みdevelopの両方を同じPagesアーティファクトへ統合します。
+`validate-develop.yml`はdevelop pushまたはmain/develop向けPRでテストとビルドを実行します。`deploy_pages.yml`はmain側で起動し、mainと検証済みdevelopの両方を同じPagesアーティファクトへ統合します。
 
 公開の詳細は[DEPLOYMENT.md](DEPLOYMENT.md)を参照してください。

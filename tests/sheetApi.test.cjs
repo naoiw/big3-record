@@ -22,6 +22,9 @@ test("understands formatted gviz date cells and explicit header rows", () => {
   const rows = parseGvizResponse("google.visualization.Query.setResponse(" + JSON.stringify(json) + ");");
   assert.equal(rows.length, 1);
   assert.equal(rows[0].timestamp, "2026/10/31");
+  const unquoted = JSON.stringify(json).replace('"Date(2026,9,31)"', 'Date(2026,9,31)');
+  const fromLiteral = parseGvizResponse("google.visualization.Query.setResponse(" + unquoted + ");");
+  assert.equal(fromLiteral[0].timestamp, "2026/10/31");
 });
 
 test("fails clearly on invalid gviz response", () => {
