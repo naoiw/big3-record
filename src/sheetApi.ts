@@ -58,7 +58,7 @@ export function parseGvizResponse(responseText: string): LogRow[] {
   // Date(...) is a JavaScript literal in some gviz responses, not valid JSON.
   // Quote only date-valued cells before parsing.
   const jsonText = responseText.slice(start, end + 1)
-    .replace(/("v"\\s*:\\s*)(Date\\(\\d{4}(?:,\\d{1,2}){2,5}\\))/g, '$1"$2"');
+    .replace(/("v"\s*:\s*)(Date\(\d{4}(?:,\d{1,2}){2,5}\))/g, '$1"$2"');
   const data = JSON.parse(jsonText) as GvizResponse;
   if (!data.table || !Array.isArray(data.table.rows)) {
     throw new Error("Google Sheets から表データを取得できませんでした。");
