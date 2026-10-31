@@ -1,57 +1,64 @@
-# big3-record
+# BIG3 Record
 
-BIG3（ベンチプレス・スクワット・デッドリフト）の記録を Google スプレッドシートから取得し、Web でグラフ表示するアプリです。自己ベストと種目ごとの推移を折れ線グラフで確認できます。
-
-## アーキテクチャ
-
-```mermaid
-sequenceDiagram
-  participant User as ユーザー
-  participant Sheet as スプレッドシート
-  participant Front as フロント Web
-  User->>User: トレーニング
-  User->>Sheet: データ記入
-  Front->>Sheet: gviz JSON で取得
-  Front->>Front: 自己ベスト算出・グラフ表示
-```
-
-- フロントは Google スプレッドシートを gviz（JSON）で取得し、React で自己ベストと折れ線グラフを表示する。
-- スプレッドシートへの記録は手動入力や Google Apps Script など任意の方法で行う。
-
-## スプレッドシート形式
-
-| 列 | 内容 |
-|---|---|
-| A | 日付（タイムスタンプ） |
-| B | BP（ベンチプレス）kg |
-| C | SQ（スクワット）kg |
-| D | DL（デッドリフト）kg |
-| E | Body Weight（体重）kg |
-
-- 1 行目はヘッダ、2 行目以降がデータ。空セルは未記録として扱う。
-- 日付は UNIX 秒・ISO 文字列・`YYYY/MM/DD` 形式などに対応。
+ベンチプレス（BP）・スクワット（SQ）・デッドリフト（DL）のトレーニング記録を表示するダッシュボードです。Google Sheetsに入力された記録から、自己ベスト、3種目の合計、体重比、各種目の推移を表示します。
 
 ## 主な機能
 
-- **自己ベスト表示**: BP・SQ・DL の各最大値と Total（BIG3 合計）を表示。表示日付付き。
-- **折れ線グラフ**: Total（BIG3）・BP・SQ・DL・Body Weight の 5 種類を Recharts で表示。
-- **補完**: グラフ描画時、BP/SQ/DL の空欄は「それ以前で最も新しい値」で補完し、Total は 3 種目から自動計算。
+- **自己ベスト** — BP・SQ・DLと、各種目の自己ベストを足したBIG3 Total
+- **体重比** — kg表示と、各種目の自己ベスト ÷ 最新の記録体重による倍率表示の切り替え
+- **グラフ** — Total、BP、SQ、DL、体重の5グラフ（6か月・1年・全期間）
+- **レスポンシブ** — PCは4列の数値カード・2列のグラフ、スマートフォンは2列のカード・1列のグラフ
+- **読み取り専用** — Google Sheetsからデータを取得して表示し、ブラウザから記録の変更は行わない
+
+## 公開先
+
+| 環境 | ブランチ | URL |
+| --- | --- | --- |
+| 本番 | `main` | https://naoiw.github.io/big3-record/ |
+| 開発プレビュー | `develop` | https://naoiw.github.io/big3-record/develop/ |
+
+両環境はGitHub Pagesの**1つのサイト**に公開します。`develop`の検証が成功したときに開発プレビューが更新され、`main`の変更は本番に反映されます。
 
 ## 技術スタック
 
-- React 18, Recharts, Vite, TypeScript
+- TypeScript / React 18 / Recharts — 表示・グラフ・集計
+- CSS / Vite — スタイル・開発・ビルド
+- Google Sheets（gviz JSON）— 記録データの読み取り
+- Node.js 20 / pnpm 9 — 開発・テスト
+- GitHub Actions / GitHub Pages — 検証・デプロイ
 
 ## ローカルで動かす
 
 ```bash
-pnpm install
-pnpm dev
+corepack enable
+pnpm install --frozen-lockfile
+pnpm dev       # 開発サーバー
+pnpm test      # 日付・集計・シート読み取りの回帰テスト
+pnpm build     # TypeScript型チェック＋本番ビルド
 ```
 
-## ビルド・デプロイ
+読み取り元のスプレッドシートIDは`src/sheetApi.ts`で定義しています。利用者のブラウザが直接読み取れるシートが必要です。認証トークンや非公開情報をコード・シートに含めないでください。
 
-```bash
-pnpm build
-```
+## 開発ルール
 
-- `main` ブランチへ push すると、GitHub Actions でビルドされ GitHub Pages に自動デプロイされます。
+実装は`develop`で行い、`main`への反映は**Pull Request**で行います。マージ後も`develop`ブランチは残して同期します。詳しくは[開発手順](docs/DEVELOPMENT.md)を参照してください。
+
+## ディレクトリ構成
+
+- `src/App.tsx` — 画面・表示モード・取得状態
+- `src/ChartCard.tsx` / `src/index.css` — グラフ・レスポンシブスタイル
+- `src/metrics.ts` / `src/timeRange.ts` — 期間選択・集計・日時
+- `src/sheetApi.ts` — Google Sheets読み取り・パース
+- `tests/` — Node.jsによる回帰テスト
+- `.github/workflows/` — CI・GitHub Pages
+- `docs/` — 仕様・開発・デプロイ
+
+## ドキュメント
+
+- [画面とデータの仕様](docs/SPEC.md)
+- [開発手順](docs/DEVELOPMENT.md)
+- [デプロイ構成](docs/DEPLOYMENT.md)
+
+## ライセンス
+
+[MIT License](LICENSE)
