@@ -1,329 +1,197 @@
 import { useEffect, useMemo, useState } from "react";
-import { fetchLogData, type LogRow } from "./sheetApi";
-import { parseTimestamp } from "./timeRange";
 import { ChartCard } from "./ChartCard";
+import { fetchLogData, type LogRow } from "./sheetApi";
+import {
+  filterHistory,
+  formatDate,
+  getBestStats,
+  prepareHistory,
+  toBodyWeightRatio,
+  type HistoryRange,
+  type LiftKey,
+} from "./metrics";
 
-/** 最新1件の行を取得（タイムスタンプが最も新しい行） */
-function getLatestRow(rows: LogRow[]): LogRow | null {
-  if (rows.length === 0) return null;
-  const withDate = rows
-    .map((row) => ({ row, date: parseTimestamp(row.timestamp) }))
-    .filter((x): x is { row: LogRow; date: Date } => x.date != null);
-  if (withDate.length === 0) return null;
-  withDate.sort((a, b) => a.date.getTime() - b.date.getTime());
-  return withDate[withDate.length - 1].row;
+const LIFTS: { key: LiftKey; abbreviation: string; label: string }[] = [
+  { key: "bp", abbreviation: "BP", label: "ベンチプレス" },
+  { key: "sq", abbreviation: "SQ", label: "スクワット" },
+  { key: "dl", abbreviation: "DL", label: "デッドリフト" },
+];
+
+const CHARTS = [
+  { key: "total", title: "BIG3 Total", color: "#53c9ae" },
+  { key: "bp", title: "Bench Press", color: "#f08f84" },
+  { key: "sq", title: "Squat", color: "#77b9f4" },
+  { key: "dl", title: "Deadlift", color: "#b49ff2" },
+  { key: "bodyWeight", title: "Body Weight", color: "#c9d4e4" },
+] as const;
+
+function formatNumber(value: number | null, ratio: boolean): string {
+  return value == null ? "—" : value.toFixed(ratio ? 2 : 1);
 }
 
 function App() {
   const [rows, setRows] = useState<LogRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  /** true: グラフを体重比で表示、false: 重量(kg)で表示 */
-  const [showWeightRatio, setShowWeightRatio] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
+  const [ratioMode, setRatioMode] = useState(false);
+  const [range, setRange] = useState<HistoryRange>("all");
+
   useEffect(() => {
-    let cancelled = false;
+    let active = true;
     setLoading(true);
     setError(null);
     fetchLogData()
-      .then((data) => {
-        if (!cancelled) setRows(data);
+      .then((data) => { if (active) setRows(data); })
+      .catch((reason: unknown) => {
+        if (active) setError(reason instanceof Error ? reason.message : String(reason));
       })
-      .catch((e) => {
-        if (!cancelled) setError(e instanceof Error ? e.message : String(e));
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [reloadKey]);
 
-  const latestRow = useMemo(() => getLatestRow(rows), [rows]);
+  const history = useMemo(() => prepareHistory(rows), [rows]);
+  const best = useMemo(() => getBestStats(history), [history]);
+  const visibleHistory = useMemo(() => filterHistory(history, range), [history, range]);
+  const latest = history.length > 0 ? history[history.length - 1] : null;
+  const latestWeight = latest?.bodyWeight ?? null;
+  const displayBest = (key: LiftKey | "total") => {
+    const value = best[key];
+    return ratioMode ? toBodyWeightRatio(value, latestWeight) : value;
+  };
 
-  /** 最新の体重（タイムスタンプが最も新しい行の体重。無ければその時点で有効な最も新しい体重） */
-  const latestBodyWeight = useMemo(() => {
-    const withDate = rows
-      .map((row) => ({ row, date: parseTimestamp(row.timestamp) }))
-      .filter((x): x is { row: LogRow; date: Date } => x.date != null);
-    withDate.sort((a, b) => b.date.getTime() - a.date.getTime());
-    for (const { row } of withDate) {
-      const bw = row.bodyWeight;
-      if (bw != null && Number.isFinite(bw) && bw > 0) return bw;
-    }
-    return null;
-  }, [rows]);
-
-  /** 全期間の最高値（BP/SQ/DL）と Total (BIG3) = 3種目合計 */
-  const bestStats = useMemo(() => {
-    const nums = (key: "bp" | "sq" | "dl") =>
-      rows
-        .map((r) => r[key])
-        .filter((v): v is number => v != null && Number.isFinite(v));
-    const maxBP = nums("bp").length ? Math.max(...nums("bp")) : null;
-    const maxSQ = nums("sq").length ? Math.max(...nums("sq")) : null;
-    const maxDL = nums("dl").length ? Math.max(...nums("dl")) : null;
-    const total =
-      maxBP != null && maxSQ != null && maxDL != null
-        ? Math.round((maxBP + maxSQ + maxDL) * 10) / 10
-        : null;
-    return { maxBP, maxSQ, maxDL, total };
-  }, [rows]);
-
-  /** 自己ベストの体重比：分子＝各種目の最大値(kg)、分母＝最新の体重 */
-  const bestStatsRatios = useMemo(() => {
-    if (latestBodyWeight == null || latestBodyWeight <= 0) {
-      return { maxBP: null, maxSQ: null, maxDL: null, total: null };
-    }
-    const round2 = (n: number) => Math.round(n * 100) / 100;
-    return {
-      maxBP:
-        bestStats.maxBP != null
-          ? round2(bestStats.maxBP / latestBodyWeight)
-          : null,
-      maxSQ:
-        bestStats.maxSQ != null
-          ? round2(bestStats.maxSQ / latestBodyWeight)
-          : null,
-      maxDL:
-        bestStats.maxDL != null
-          ? round2(bestStats.maxDL / latestBodyWeight)
-          : null,
-      total:
-        bestStats.total != null
-          ? round2(bestStats.total / latestBodyWeight)
-          : null,
-    };
-  }, [rows, bestStats, latestBodyWeight]);
-
-  if (loading) return <p>読み込み中…</p>;
-  if (error) return <p>エラー: {error}</p>;
-
-  const formatValue = (v: number | null, unit: string, decimals = 1) =>
-    v != null && Number.isFinite(v)
-      ? unit ? `${v.toFixed(decimals)} ${unit}` : v.toFixed(decimals)
-      : "—";
+  const ratioDescription = ratioMode
+    ? "各種目の最高記録 ÷ 最新の記録体重"
+    : "各種目の自己ベスト（全期間）";
 
   return (
-    <div style={{ padding: "1rem", fontFamily: "sans-serif", maxWidth: 900 }}>
-      <h1>精進の記録（BIG3）</h1>
+    <div className="dashboard">
+      <header className="page-header">
+        <div className="brand">
+          <span className="brand-mark" aria-hidden="true"><i /><i /><i /></span>
+          <span>BIG3 RECORD</span>
+        </div>
+        <span className="header-caption">TRAINING LOG</span>
+      </header>
 
-      <div
-        style={{
-          marginBottom: "1rem",
-          display: "flex",
-          alignItems: "center",
-          gap: "0.5rem",
-        }}
-      >
-        <span style={{ fontSize: "0.9rem", color: "#495057" }}>グラフ表示:</span>
-        <button
-          type="button"
-          onClick={() => setShowWeightRatio(false)}
-          style={{
-            padding: "0.35rem 0.75rem",
-            fontSize: "0.875rem",
-            border: "1px solid #dee2e6",
-            borderRadius: 6,
-            background: showWeightRatio ? "#fff" : "#e9ecef",
-            fontWeight: showWeightRatio ? 400 : 600,
-            cursor: "pointer",
-          }}
-        >
-          重量 (kg)
-        </button>
-        <button
-          type="button"
-          onClick={() => setShowWeightRatio(true)}
-          style={{
-            padding: "0.35rem 0.75rem",
-            fontSize: "0.875rem",
-            border: "1px solid #dee2e6",
-            borderRadius: 6,
-            background: showWeightRatio ? "#e9ecef" : "#fff",
-            fontWeight: showWeightRatio ? 600 : 400,
-            cursor: "pointer",
-          }}
-        >
-          体重比
-        </button>
-      </div>
-
-      {latestRow && (
-        <section
-          style={{
-            marginBottom: "1.5rem",
-            padding: "1rem 1.25rem",
-            background: "#f8f9fa",
-            borderRadius: 8,
-            border: "1px solid #e9ecef",
-          }}
-        >
-          <h2 style={{ margin: "0 0 0.75rem", fontSize: "0.95rem", color: "#495057" }}>
-            自己ベスト
-            {latestRow.timestamp && (
-              <span style={{ fontWeight: 400, marginLeft: "0.5rem" }}>
-                （{parseTimestamp(latestRow.timestamp)?.toLocaleDateString("ja-JP") ?? latestRow.timestamp}）
-              </span>
-            )}
-          </h2>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))",
-              gap: "1rem",
-            }}
-          >
-            <div>
-              <span style={{ fontSize: "0.8rem", color: "#6c757d" }}>BP（ベンチプレス）</span>
-              <div style={{ fontSize: "1.25rem", fontWeight: 600, color: "#e74c3c" }}>
-                {showWeightRatio
-                  ? formatValue(bestStatsRatios.maxBP, "倍", 2)
-                  : formatValue(bestStats.maxBP, "kg")}
-              </div>
-            </div>
-            <div>
-              <span style={{ fontSize: "0.8rem", color: "#6c757d" }}>SQ（スクワット）</span>
-              <div style={{ fontSize: "1.25rem", fontWeight: 600, color: "#3498db" }}>
-                {showWeightRatio
-                  ? formatValue(bestStatsRatios.maxSQ, "倍", 2)
-                  : formatValue(bestStats.maxSQ, "kg")}
-              </div>
-            </div>
-            <div>
-              <span style={{ fontSize: "0.8rem", color: "#6c757d" }}>DL（デッドリフト）</span>
-              <div style={{ fontSize: "1.25rem", fontWeight: 600, color: "#9b59b6" }}>
-                {showWeightRatio
-                  ? formatValue(bestStatsRatios.maxDL, "倍", 2)
-                  : formatValue(bestStats.maxDL, "kg")}
-              </div>
-            </div>
-            <div>
-              <span style={{ fontSize: "0.8rem", color: "#6c757d" }}>Total (BIG3)</span>
-              <div style={{ fontSize: "1.25rem", fontWeight: 600, color: "#27ae60" }}>
-                {showWeightRatio
-                  ? formatValue(bestStatsRatios.total, "倍", 2)
-                  : formatValue(bestStats.total, "kg")}
-              </div>
-            </div>
+      <main>
+        <section className="hero" aria-labelledby="page-title">
+          <div>
+            <p className="eyebrow">PERSONAL RECORDS</p>
+            <h1 id="page-title">精進の記録 <span>BIG3</span></h1>
+            <p className="hero-description">ベンチプレス・スクワット・デッドリフトの記録</p>
           </div>
+          <div className="hero-aside">
+            <span className="eyebrow">LATEST ENTRY</span>
+            <strong>{formatDate(latest?.date ?? null)}</strong>
+            <small>Google Sheets の記録から表示</small>
+          </div>
+        </section>
 
-          {/* Totalに占めるBP/SQ/DLの割合（長方形で表現） */}
-          {bestStats.total != null &&
-            bestStats.total > 0 &&
-            bestStats.maxBP != null &&
-            bestStats.maxSQ != null &&
-            bestStats.maxDL != null && (
-              <div style={{ marginTop: "1.25rem", paddingTop: "1rem", borderTop: "1px solid #e9ecef" }}>
-                <div style={{ fontSize: "0.8rem", color: "#6c757d", marginBottom: "0.5rem" }}>
-                  Totalに占める割合
+        {error && (
+          <div className="notice notice-error" role="alert">
+            <div><strong>データを取得できませんでした</strong><p>{error}</p></div>
+            <button type="button" onClick={() => setReloadKey((n) => n + 1)}>再試行</button>
+          </div>
+        )}
+
+        {loading && history.length === 0 ? (
+          <div className="empty-screen" role="status">記録を読み込んでいます…</div>
+        ) : history.length === 0 ? (
+          <div className="empty-screen">表示できる記録がありません。シートの日付と公開設定を確認してください。</div>
+        ) : (
+          <>
+            <section aria-labelledby="records-title">
+              <div className="section-heading">
+                <div>
+                  <p className="eyebrow">BEST LIFTS</p>
+                  <h2 id="records-title">自己ベスト</h2>
+                  <p className="section-note">{ratioDescription}</p>
                 </div>
-                <div
-                  style={{
-                    display: "flex",
-                    width: "100%",
-                    height: 44,
-                    borderRadius: 6,
-                    overflow: "hidden",
-                    border: "1px solid #dee2e6",
-                  }}
-                >
-                  <div
-                    style={{
-                      width: `${(bestStats.maxBP / bestStats.total) * 100}%`,
-                      minWidth: 0,
-                      background: "#e74c3c",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      color: "#fff",
-                      fontWeight: 600,
-                      fontSize: "1.1rem",
-                      overflow: "hidden",
-                    }}
-                    title={`BP ${((bestStats.maxBP / bestStats.total) * 100).toFixed(1)}%`}
-                  >
-                    BP {((bestStats.maxBP / bestStats.total) * 100).toFixed(1)}%
-                  </div>
-                  <div
-                    style={{
-                      width: `${(bestStats.maxSQ / bestStats.total) * 100}%`,
-                      minWidth: 0,
-                      background: "#3498db",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      color: "#fff",
-                      fontWeight: 600,
-                      fontSize: "1.1rem",
-                      overflow: "hidden",
-                    }}
-                    title={`SQ ${((bestStats.maxSQ / bestStats.total) * 100).toFixed(1)}%`}
-                  >
-                    SQ {((bestStats.maxSQ / bestStats.total) * 100).toFixed(1)}%
-                  </div>
-                  <div
-                    style={{
-                      width: `${(bestStats.maxDL / bestStats.total) * 100}%`,
-                      minWidth: 0,
-                      background: "#9b59b6",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      color: "#fff",
-                      fontWeight: 600,
-                      fontSize: "1.1rem",
-                      overflow: "hidden",
-                    }}
-                    title={`DL ${((bestStats.maxDL / bestStats.total) * 100).toFixed(1)}%`}
-                  >
-                    DL {((bestStats.maxDL / bestStats.total) * 100).toFixed(1)}%
-                  </div>
+                <div className="segmented" role="group" aria-label="表示単位">
+                  <button type="button" className={!ratioMode ? "active" : ""} aria-pressed={!ratioMode} onClick={() => setRatioMode(false)}>重量 (kg)</button>
+                  <button type="button" className={ratioMode ? "active" : ""} aria-pressed={ratioMode} onClick={() => setRatioMode(true)}>体重比</button>
                 </div>
               </div>
-            )}
-        </section>
-      )}
+              <div className="metric-grid">
+                {LIFTS.map((lift) => (
+                  <article className="metric-card" data-tone={lift.key} key={lift.key}>
+                    <div className="metric-top">
+                      <span className="metric-name">{lift.abbreviation}</span>
+                      <span className="metric-symbol" aria-hidden="true">↗</span>
+                    </div>
+                    <p className="metric-description">{lift.label}</p>
+                    <p className="metric-reading"><strong>{formatNumber(displayBest(lift.key), ratioMode)}</strong><span>{ratioMode ? "倍" : "kg"}</span></p>
+                    <div className="metric-rule" />
+                  </article>
+                ))}
+                <article className="metric-card metric-total" data-tone="total">
+                  <div className="metric-top"><span className="metric-name">TOTAL</span><span className="metric-symbol" aria-hidden="true">Σ</span></div>
+                  <p className="metric-description">3種目の自己ベスト合計</p>
+                  <p className="metric-reading"><strong>{formatNumber(displayBest("total"), ratioMode)}</strong><span>{ratioMode ? "倍" : "kg"}</span></p>
+                  <div className="metric-rule" />
+                </article>
+              </div>
+            </section>
 
-      <ChartCard
-        title="Total (BIG3)"
-        unit="kg"
-        dataKey="total"
-        data={rows}
-        color="#27ae60"
-        weightRatio={showWeightRatio}
-      />
-      <ChartCard
-        title="BP（ベンチプレス）"
-        unit="kg"
-        dataKey="bp"
-        data={rows}
-        color="#e74c3c"
-        weightRatio={showWeightRatio}
-      />
-      <ChartCard
-        title="SQ（スクワット）"
-        unit="kg"
-        dataKey="sq"
-        data={rows}
-        color="#3498db"
-        weightRatio={showWeightRatio}
-      />
-      <ChartCard
-        title="DL（デッドリフト）"
-        unit="kg"
-        dataKey="dl"
-        data={rows}
-        color="#9b59b6"
-        weightRatio={showWeightRatio}
-      />
-      <ChartCard
-        title="Body Weight（体重）"
-        unit="kg"
-        dataKey="bodyWeight"
-        data={rows}
-        color="#27ae60"
-      />
+            <section className="overview" aria-label="記録サマリー">
+              <div className="overview-info">
+                <span className="eyebrow">BODY WEIGHT</span>
+                <strong>{formatNumber(latestWeight, false)} <small>kg</small></strong>
+                <span className="overview-hint">最新の記録体重</span>
+              </div>
+              <div className="overview-breakdown">
+                <span className="eyebrow">PERSONAL BEST COMPOSITION</span>
+                {best.total !== null && best.total > 0 ? (
+                  <>
+                    <div className="composition" aria-label="3種目の自己ベスト重量比">
+                      {LIFTS.map((lift) => (
+                        <div key={lift.key} className={"composition-" + lift.key}
+                          style={{ width: ((best[lift.key] ?? 0) / best.total! * 100) + "%" }}
+                          title={lift.abbreviation + ": " + ((best[lift.key] ?? 0) / best.total! * 100).toFixed(1) + "%"} />
+                      ))}
+                    </div>
+                    <div className="composition-legend">
+                      {LIFTS.map((lift) => (
+                        <span key={lift.key}><i className={"legend-dot dot-" + lift.key} />{lift.abbreviation} {((best[lift.key] ?? 0) / best.total! * 100).toFixed(1)}%</span>
+                      ))}
+                    </div>
+                  </>
+                ) : <p className="section-note">3種目が揃うと内訳を表示します。</p>}
+              </div>
+            </section>
+
+            <section className="trends" aria-labelledby="trends-title">
+              <div className="section-heading section-heading-trends">
+                <div>
+                  <p className="eyebrow">HISTORY</p>
+                  <h2 id="trends-title">記録の推移</h2>
+                  <p className="section-note">選択期間は最新記録日を基準に計算します。</p>
+                </div>
+                <div className="segmented" role="group" aria-label="グラフの期間">
+                  {([
+                    ["6m", "6か月"], ["12m", "1年"], ["all", "全期間"],
+                  ] as const).map(([value, label]) => (
+                    <button key={value} type="button" className={range === value ? "active" : ""} aria-pressed={range === value} onClick={() => setRange(value)}>{label}</button>
+                  ))}
+                </div>
+              </div>
+              <div className="chart-grid">
+                {CHARTS.map((chart) => (
+                  <ChartCard key={chart.key} dataKey={chart.key} title={chart.title}
+                    color={chart.color} history={visibleHistory} ratioMode={ratioMode} />
+                ))}
+              </div>
+              <p className="chart-footnote">未記録の種目・体重は直前の有効値を引き継ぎます。Totalはその時点の3種目の合計です。体重比は各時点で有効な体重を用います。</p>
+            </section>
+          </>
+        )}
+      </main>
+
+      <footer className="page-footer">
+        <span>BIG3 RECORD</span>
+        <a href="https://github.com/naoiw/big3-record" target="_blank" rel="noopener noreferrer">GitHub</a>
+      </footer>
     </div>
   );
 }

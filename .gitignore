@@ -1,4 +1,16 @@
-node_modules
-dist
+# Dependencies and build output
+node_modules/
+dist/
+tests/dist/
+*.tsbuildinfo
 *.local
+.env
+.env.*
+!.env.example
+
+# OS, editors and logs
 .DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.log
