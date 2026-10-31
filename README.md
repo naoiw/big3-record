@@ -19,14 +19,14 @@
 
 2環境は1つのGitHub Pagesサイトに公開。実装はdevelop、mainへの反映はPR経由です。
 
-## データ構造
+## Google Sheetsのデータ構造
 
 | シート名 | 1行目のヘッダー | 用途 |
 | --- | --- | --- |
 | **pr_records** | date, exercise, weight_kg | 1RM自己ベストを更新した時に1行 |
 | **body_weight** | date, weight_kg | 体重を測定した日に1行 |
 
-旧形式（日付・BP・SQ・DL・体重の5列）から暫定的に読み込む互換処理があります。**スプレッドシートの新2タブ作成・移行は自動では行いません。**
+ヘッダー名と入力規則、不正データの警告については[画面・データ仕様](docs/SPEC.md)を参照してください。
 
 ## 技術スタック
 
@@ -47,7 +47,6 @@ pnpm build
 ## ドキュメント
 
 - [画面・データ仕様](docs/SPEC.md)
-- [2シート構成への移行と入力規則](docs/MIGRATION.md)
 - [開発手順](docs/DEVELOPMENT.md)
 - [デプロイ構成](docs/DEPLOYMENT.md)
 
@@ -55,8 +54,7 @@ pnpm build
 
 - src/ — React画面・グラフ・データ取得・集計
 - tests/ — 自動テスト
-- scripts/ — 一度限りの移行補助（任意実行）
-- docs/ — 詳細仕様・移行・開発・デプロイ
+- docs/ — 詳細仕様・開発・デプロイ
 - .github/workflows/ — CI・Pages
 
 ## ライセンス

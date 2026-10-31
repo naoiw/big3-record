@@ -25,14 +25,11 @@ pnpm build
 
 | パス | 役割 |
 | --- | --- |
-| src/sheetApi.ts | 2タブのgviz読み取り・旧形式フォールバック |
+| src/sheetApi.ts | 2タブのgviz読み取り・ヘッダー検証 |
 | src/timeRange.ts | 日本の暦日キー・日時検証 |
 | src/metrics.ts | 自己ベスト・達成日・体重比・7日平均・集計 |
 | src/App.tsx | データ取得、サマリー、切り替えUI、警告 |
 | src/ChartCard.tsx | PB推移・体重および平均体重のグラフ |
 | tests/ | データ正規化・集計・入力パースの回帰テスト |
-| scripts/migrate-legacy.gs | 任意実行する一度限りの移行補助 |
 
-詳細は [SPEC.md](SPEC.md) を、スプレッドシート側の作業は [MIGRATION.md](MIGRATION.md) を、デプロイ構成は [DEPLOYMENT.md](DEPLOYMENT.md) を参照してください。
-
-**Sheetsのデータ移行はGitHubへのpushでは実行されません。** バックアップ・照合が完了するまでmainにはマージしないでください。
+詳細仕様とスプレッドシートの入力規則は [SPEC.md](SPEC.md)、デプロイ構成は [DEPLOYMENT.md](DEPLOYMENT.md) を参照してください。
