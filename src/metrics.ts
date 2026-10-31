@@ -114,10 +114,9 @@ export function prepareTraining(prRecords: PrRecord[], bodyWeightRecords: BodyWe
     const currentWeight = weightIndex >= 0 ? weights[weightIndex] : null;
     const age = currentWeight ? dayNumber(day) - dayNumber(currentWeight.day) : Infinity;
     const weightForRatio = currentWeight && age >= 0 && age <= 7 ? currentWeight.weightKg : null;
-    // Sum available personal bests; distinguish "no lifts recorded" from 0 kg.
-    const recordedBests = LIFTS.map(lift => best[lift]).filter((value): value is number => value !== null);
-    best.total = recordedBests.length > 0
-      ? round(recordedBests.reduce((sum, value) => sum + value, 0), 1) : null;
+    // Total starts only after all three individual personal bests are recorded.
+    best.total = LIFTS.every(lift => best[lift] !== null)
+      ? round(best.bp! + best.sq! + best.dl!, 1) : null;
     history.push({ day, date: dayNumber(day) * 86400000, ...best, weightForRatio });
   }
 

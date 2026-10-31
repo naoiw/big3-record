@@ -3,7 +3,7 @@ const assert = require("node:assert/strict");
 const { prepareTraining, toBodyWeightRatio, filterByRange } = require("./dist/metrics.js");
 const { toDayKey, dayNumber } = require("./dist/timeRange.js");
 
-test("PR events are progressive, independent and cumulative with partial Total", () => {
+test("PR events are progressive; Total begins after all three lifts are recorded", () => {
   const data = prepareTraining([
     { date: "2026-09-15", exercise: "BP", weightKg: 115 },
     { date: "2026-09-01", exercise: "BP", weightKg: 110 },
@@ -11,7 +11,7 @@ test("PR events are progressive, independent and cumulative with partial Total",
     { date: "2026-09-27", exercise: "DL", weightKg: 170 },
     { date: "2026-10-01", exercise: "SQ", weightKg: 120 },
   ], []);
-  assert.deepEqual(data.history.map(point => point.total), [110, 270, 275, 285, 405]);
+  assert.deepEqual(data.history.map(point => point.total), [null, null, null, null, 405]);
   assert.equal(data.history.at(-1).total, 405);
   assert.deepEqual(data.best, { bp: 115, sq: 120, dl: 170, total: 405 });
   assert.deepEqual(data.achieved, { bp: "2026-09-15", sq: "2026-10-01", dl: "2026-09-27" });
@@ -19,22 +19,36 @@ test("PR events are progressive, independent and cumulative with partial Total",
 });
 
 
-test("Total includes one or two recorded lifts without fabricating missing PBs", () => {
-  const onlyBP = prepareTraining([
+test("Total and Total ratio remain unavailable with only one or two lifts", () => {
+  const oneLift = prepareTraining([
     { date: "2026-01-01", exercise: "BP", weightKg: 100 },
     { date: "2026-01-15", exercise: "BP", weightKg: 105 },
   ], [{ date: "2026-01-01", weightKg: 80 }]);
-  assert.deepEqual(onlyBP.best, { bp: 105, sq: null, dl: null, total: 105 });
-  assert.deepEqual(onlyBP.history.map(point => point.total), [100, 105]);
+  assert.deepEqual(oneLift.best, { bp: 105, sq: null, dl: null, total: null });
+  assert.deepEqual(oneLift.history.map(point => point.total), [null, null]);
+  assert.equal(toBodyWeightRatio(oneLift.best.total, 80), null);
 
   const twoLifts = prepareTraining([
     { date: "2026-01-01", exercise: "BP", weightKg: 100 },
     { date: "2026-01-02", exercise: "DL", weightKg: 150 },
   ], []);
-  assert.deepEqual(twoLifts.best, { bp: 100, sq: null, dl: 150, total: 250 });
-  assert.equal(twoLifts.history[0].total, 100);
-  assert.equal(twoLifts.history[1].total, 250);
-  assert.equal(toBodyWeightRatio(twoLifts.best.total, 80), 3.13);
+  assert.deepEqual(twoLifts.best, { bp: 100, sq: null, dl: 150, total: null });
+  assert.deepEqual(twoLifts.history.map(point => point.total), [null, null]);
+});
+
+test("Total starts when third lift is first recorded and then follows PB increases", () => {
+  const summary = prepareTraining([
+    { date: "2026-01-01", exercise: "BP", weightKg: 100 },
+    { date: "2026-01-02", exercise: "DL", weightKg: 150 },
+    { date: "2026-01-03", exercise: "SQ", weightKg: 120 },
+    { date: "2026-01-04", exercise: "BP", weightKg: 105 },
+  ], [
+    { date: "2026-01-01", weightKg: 80 },
+    { date: "2026-01-05", weightKg: 81 },
+  ]);
+  assert.deepEqual(summary.history.map(p => p.total), [null, null, 370, 375, 375]);
+  assert.equal(summary.best.total, 375);
+  assert.equal(toBodyWeightRatio(summary.best.total, summary.latestWeight.weightKg), 4.63);
 });
 
 test("Total is unavailable when there are no valid lift records", () => {
