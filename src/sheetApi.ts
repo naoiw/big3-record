@@ -1,90 +1,113 @@
-/** Public, read-only Google Sheet used by the dashboard. Do not store secrets here. */
+/** Public, read-only Google Sheet. Do not include private data or credentials. */
 export const SPREADSHEET_ID = "1hpUEOWQJ4bofox-do8eRF7fNlVknVyNK8kHsUiTOmAk";
-const SHEET_URL = "https://docs.google.com/spreadsheets/d/" + SPREADSHEET_ID + "/gviz/tq?tqx=out:json";
+export type Exercise = "BP" | "SQ" | "DL";
 
-export interface LogRow {
-  timestamp: string;
-  bp: number | null;
-  sq: number | null;
-  dl: number | null;
-  bodyWeight: number | null;
+export interface PrRecord { date: string; exercise: Exercise; weightKg: number; }
+export interface BodyWeightRecord { date: string; weightKg: number; }
+export interface TrainingData {
+  prRecords: PrRecord[];
+  bodyWeightRecords: BodyWeightRecord[];
 }
 
-interface GvizCell {
-  v?: string | number | null;
-  f?: string;
+interface Cell { v?: string | number | null; f?: string; }
+interface ResponseBody {
+  status?: string;
+  errors?: { message?: string }[];
+  table?: {
+    cols?: { label?: string }[];
+    rows?: { c?: (Cell | null)[] }[];
+  };
 }
 
-interface GvizResponse {
-  table?: { rows?: { c?: (GvizCell | null)[] }[] };
-}
-
-function getCellNumber(cell: GvizCell | null | undefined): number | null {
+function cellNumber(cell: Cell | null | undefined): number | null {
   const value = cell?.v;
   if (value === null || value === undefined || value === "") return null;
   const number = Number(value);
   return Number.isFinite(number) ? number : null;
 }
 
-function getCellTimestamp(cell: GvizCell | null | undefined): string {
-  const raw = cell?.v ?? cell?.f;
-  if (raw === null || raw === undefined || raw === "") return "";
-
-  const number = Number(raw);
-  if (Number.isFinite(number) && number >= 1e9 && number < 1e15) {
-    return new Date(number < 1e12 ? number * 1000 : number).toISOString();
-  }
-
-  // gviz dates can be represented as Date(year, zeroBasedMonth, day, ...).
-  // Prefer the formatted sheet cell when available.
-  if (typeof raw === "string" && /^Date\(/.test(raw)) {
-    if (cell?.f) return cell.f;
-    const match = /^Date\((\d{4}),(\d{1,2}),(\d{1,2})(?:,(\d{1,2}),(\d{1,2}),(\d{1,2}))?\)$/.exec(raw);
-    if (match) {
-      const date = new Date(Number(match[1]), Number(match[2]), Number(match[3]),
-        Number(match[4] ?? 0), Number(match[5] ?? 0), Number(match[6] ?? 0));
-      return date.toISOString();
+function cellText(cell: Cell | null | undefined): string {
+  if (cell == null) return "";
+  const raw = cell.v ?? cell.f;
+  if (raw === undefined || raw === null) return "";
+  if (typeof raw === "string" && raw.startsWith("Date(")) {
+    if (cell.f) return cell.f;
+    const found = /^Date\((\d{4}),(\d{1,2}),(\d{1,2})(?:,\d{1,2},\d{1,2},\d{1,2})?\)$/.exec(raw);
+    if (found) {
+      return found[1] + "-" + String(Number(found[2]) + 1).padStart(2, "0") +
+        "-" + found[3].padStart(2, "0");
     }
   }
-  return String(cell?.f ?? raw);
-}
-
-/** Extract the JSON object from the Google Visualization callback wrapper. */
-export function parseGvizResponse(responseText: string): LogRow[] {
-  const start = responseText.indexOf("{");
-  const end = responseText.lastIndexOf("}");
-  if (start === -1 || end <= start) throw new Error("Google Sheets の応答形式が不正です。");
-
-  // Date(...) is a JavaScript literal in some gviz responses, not valid JSON.
-  // Quote only date-valued cells before parsing.
-  const jsonText = responseText.slice(start, end + 1)
-    .replace(/("v"\s*:\s*)(Date\(\d{4}(?:,\d{1,2}){2,5}\))/g, '$1"$2"');
-  const data = JSON.parse(jsonText) as GvizResponse;
-  if (!data.table || !Array.isArray(data.table.rows)) {
-    throw new Error("Google Sheets から表データを取得できませんでした。");
+  const numeric = Number(raw);
+  if (Number.isFinite(numeric) && numeric >= 1e9 && numeric < 1e15) {
+    return new Date(numeric < 1e12 ? numeric * 1000 : numeric).toISOString();
   }
-
-  // A gviz query normally consumes the first Sheet row as column labels.
-  // Skip a heading only if it is explicitly present in the returned data.
-  return data.table.rows
-    .filter((row) => {
-      const title = String(row.c?.[0]?.v ?? row.c?.[0]?.f ?? "").trim();
-      return !/^(timestamp|date|日時|日付)$/i.test(title);
-    })
-    .map((row) => {
-      const cells = row.c ?? [];
-      return {
-        timestamp: getCellTimestamp(cells[0]),
-        bp: getCellNumber(cells[1]),
-        sq: getCellNumber(cells[2]),
-        dl: getCellNumber(cells[3]),
-        bodyWeight: getCellNumber(cells[4]),
-      };
-    });
+  return String(cell.f ?? raw);
 }
 
-export async function fetchLogData(): Promise<LogRow[]> {
-  const response = await fetch(SHEET_URL);
-  if (!response.ok) throw new Error("HTTP " + response.status + ": " + response.statusText);
-  return parseGvizResponse(await response.text());
+/** Gviz wraps JSON in a callback and may emit unquoted Date(...) expressions. */
+function decodeGviz(text: string): ResponseBody {
+  const start = text.indexOf("{");
+  const end = text.lastIndexOf("}");
+  if (start < 0 || end <= start) throw new Error("Google Sheets の応答形式が不正です。");
+  const json = text.slice(start, end + 1)
+    .replace(/("v"\s*:\s*)(Date\(\d{4}(?:,\d{1,2}){2,5}\))/g, '$1"$2"');
+  const parsed = JSON.parse(json) as ResponseBody;
+  if (parsed.status === "error") throw new Error(parsed.errors?.[0]?.message ?? "gviz query error");
+  if (!Array.isArray(parsed.table?.rows)) throw new Error("シートの表データを取得できませんでした。");
+  return parsed;
+}
+
+function readTable(text: string, expected: string[]): (Cell | null)[][] {
+  const table = decodeGviz(text).table!;
+  const rows = table.rows!.map(row => row.c ?? []);
+  const names = (table.cols ?? []).map(col => (col.label ?? "").trim().toLowerCase());
+  const first = rows[0]?.map(cell => cellText(cell).trim().toLowerCase()) ?? [];
+  const header = expected.map(item => item.toLowerCase());
+  const colMatches = header.every((name, index) => names[index] === name);
+  const rowMatches = header.every((name, index) => first[index] === name);
+  if (!colMatches && !rowMatches) {
+    throw new Error("シートのヘッダーが一致しません: " + expected.join(", "));
+  }
+  return rowMatches ? rows.slice(1) : rows;
+}
+
+export function parsePrSheet(text: string): PrRecord[] {
+  return readTable(text, ["date", "exercise", "weight_kg"]).map(row => ({
+    date: cellText(row[0]), exercise: cellText(row[1]).trim().toUpperCase() as Exercise,
+    weightKg: cellNumber(row[2]) ?? NaN,
+  }));
+}
+
+export function parseBodyWeightSheet(text: string): BodyWeightRecord[] {
+  return readTable(text, ["date", "weight_kg"]).map(row => ({
+    date: cellText(row[0]), weightKg: cellNumber(row[1]) ?? NaN,
+  }));
+}
+
+/** Reads only the two current tabs; missing tabs are treated as errors. */
+async function fetchSheet(sheet: "pr_records" | "body_weight"): Promise<string> {
+  const url = "https://docs.google.com/spreadsheets/d/" + SPREADSHEET_ID +
+    "/gviz/tq?tqx=out:json&sheet=" + encodeURIComponent(sheet);
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(sheet + " の取得に失敗しました (HTTP " + response.status + ")");
+  }
+  return response.text();
+}
+
+export async function fetchTrainingData(): Promise<TrainingData> {
+  const [prResponse, weightResponse] = await Promise.all([
+    fetchSheet("pr_records"),
+    fetchSheet("body_weight"),
+  ]);
+  try {
+    return {
+      prRecords: parsePrSheet(prResponse),
+      bodyWeightRecords: parseBodyWeightSheet(weightResponse),
+    };
+  } catch (error) {
+    throw new Error("スプレッドシートの形式を確認してください: " +
+      (error instanceof Error ? error.message : String(error)));
+  }
 }
