@@ -18,11 +18,11 @@
 body { margin: 0; min-width: 320px; }
 button { font: inherit; }
 button:focus-visible, a:focus-visible { outline: 2px solid #79d9bd; outline-offset: 3px; }
-.dashboard { max-width: var(--chrome-width); margin: auto; padding: 0 var(--chrome-gutter) 36px; }
+.dashboard { max-width: var(--chrome-width); margin: auto; padding: 0 var(--chrome-gutter); }
 .page-header, .brand, .hero, .section-heading, .metric-top, .chart-heading, .page-footer { display: flex; align-items: center; }
 .page-header { justify-content: space-between; min-height: var(--chrome-header-height); border-bottom: 1px solid #263347; }
 .brand { gap: 11px; font-weight: 800; letter-spacing: .02em; font-size: var(--chrome-brand-size); }
-.brand-mark { display: flex; align-items: flex-end; justify-content: center; gap: 3px; width: 36px; height: 36px; padding: 8px; border-radius: 10px; background: #203a52; }
+.brand-mark { display: flex; align-items: flex-end; justify-content: center; gap: 2px; width: 36px; height: 36px; padding: 8px; border-radius: 10px; background: #203a52; }
 .brand-mark i { width: 5px; height: 12px; background: #f08f84; border-radius: 3px; }
 .brand-mark i:nth-child(2) { height: 20px; background: #77b9f4; }
 .brand-mark i:nth-child(3) { height: 16px; background: #b49ff2; }
@@ -93,7 +93,7 @@ h1 span { color: #89a1bf; font-weight: 500; }
   .metric-total { grid-column: auto; }
 }
 @media (max-width: 700px) {
-  .dashboard { padding: 0 var(--chrome-gutter) 26px; }
+  .dashboard { padding: 0 var(--chrome-gutter); }
   .header-caption { display: none; }
   .hero { flex-direction: column; align-items: flex-start; gap: 20px; padding: 28px 0 34px; }
   .hero-aside { text-align: left; padding: 12px 15px; border: 1px solid #2a394e; border-radius: 10px; width: 100%; }
