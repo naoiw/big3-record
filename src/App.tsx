@@ -86,19 +86,12 @@ function App() {
             <button type="button" onClick={() => setReloadKey(n => n + 1)}>再試行</button>
           </div>
         )}
-        {data?.source === "legacy" && (
-          <div className="source-notice" role="status">
-            現在は旧形式のスプレッドシートを読み込んでいます。
-            <a href="https://github.com/naoiw/big3-record/blob/develop/docs/MIGRATION.md"
-              target="_blank" rel="noopener noreferrer">移行手順</a>
-          </div>
-        )}
-        {data && (summary.warnings.length > 0 || data.warnings.length > 0) && (
+        {data && (summary.warnings.length > 0) && (
           <details className="warnings">
-            <summary>データに関するお知らせ（{data.warnings.length + summary.warnings.length}件）</summary>
-            <ul>{[...data.warnings, ...summary.warnings].slice(0, 15).map((warning, index) =>
+            <summary>データに関するお知らせ（{summary.warnings.length}件）</summary>
+            <ul>{summary.warnings.slice(0, 15).map((warning, index) =>
               <li key={index}>{warning}</li>)}</ul>
-            {data.warnings.length + summary.warnings.length > 15 && <p>ほかにも警告があります。シートを確認してください。</p>}
+            {summary.warnings.length > 15 && <p>ほかにも警告があります。シートを確認してください。</p>}
           </details>
         )}
 

@@ -1,5 +1,3 @@
-import { toDayKey } from "./timeRange";
-
 /** Public, read-only Google Sheet. Do not include private data or credentials. */
 export const SPREADSHEET_ID = "1hpUEOWQJ4bofox-do8eRF7fNlVknVyNK8kHsUiTOmAk";
 export type Exercise = "BP" | "SQ" | "DL";
@@ -9,8 +7,6 @@ export interface BodyWeightRecord { date: string; weightKg: number; }
 export interface TrainingData {
   prRecords: PrRecord[];
   bodyWeightRecords: BodyWeightRecord[];
-  source: "split" | "legacy";
-  warnings: string[];
 }
 
 interface Cell { v?: string | number | null; f?: string; }
@@ -62,19 +58,18 @@ function decodeGviz(text: string): ResponseBody {
   return parsed;
 }
 
-function readTable(text: string, expected: string[] | null): (Cell | null)[][] {
+function readTable(text: string, expected: string[]): (Cell | null)[][] {
   const table = decodeGviz(text).table!;
   const rows = table.rows!.map(row => row.c ?? []);
   const names = (table.cols ?? []).map(col => (col.label ?? "").trim().toLowerCase());
   const first = rows[0]?.map(cell => cellText(cell).trim().toLowerCase()) ?? [];
-  if (expected) {
-    const header = expected.map(item => item.toLowerCase());
-    const colMatches = header.every((name, index) => names[index] === name);
-    const rowMatches = header.every((name, index) => first[index] === name);
-    if (!colMatches && !rowMatches) throw new Error("シートのヘッダーが一致しません: " + expected.join(", "));
-    return rowMatches ? rows.slice(1) : rows;
+  const header = expected.map(item => item.toLowerCase());
+  const colMatches = header.every((name, index) => names[index] === name);
+  const rowMatches = header.every((name, index) => first[index] === name);
+  if (!colMatches && !rowMatches) {
+    throw new Error("シートのヘッダーが一致しません: " + expected.join(", "));
   }
-  return rows.filter(row => !/^(timestamp|date|日時|日付)$/i.test(cellText(row[0]).trim()));
+  return rowMatches ? rows.slice(1) : rows;
 }
 
 export function parsePrSheet(text: string): PrRecord[] {
@@ -90,71 +85,29 @@ export function parseBodyWeightSheet(text: string): BodyWeightRecord[] {
   }));
 }
 
-export interface LegacyRow {
-  timestamp: string;
-  bp: number | null;
-  sq: number | null;
-  dl: number | null;
-  bodyWeight: number | null;
-}
-export function parseGvizResponse(text: string): LegacyRow[] {
-  return readTable(text, null).map(row => ({
-    timestamp: cellText(row[0]), bp: cellNumber(row[1]), sq: cellNumber(row[2]),
-    dl: cellNumber(row[3]), bodyWeight: cellNumber(row[4]),
-  }));
-}
-
-/** Keeps data unchanged; the shared metrics layer checks PB progression and duplicates. */
-export function convertLegacy(rows: LegacyRow[]): Pick<TrainingData, "prRecords" | "bodyWeightRecords"> {
-  const prRecords: PrRecord[] = [];
-  const bodyWeightRecords: BodyWeightRecord[] = [];
-  for (const row of rows) {
-    const date = toDayKey(row.timestamp) ?? row.timestamp;
-    for (const [field, exercise] of [
-      ["bp", "BP"], ["sq", "SQ"], ["dl", "DL"],
-    ] as const) {
-      const weightKg = row[field];
-      if (weightKg !== null) prRecords.push({ date, exercise, weightKg });
-    }
-    if (row.bodyWeight !== null) bodyWeightRecords.push({ date, weightKg: row.bodyWeight });
+/** Reads only the two current tabs; missing tabs are treated as errors. */
+async function fetchSheet(sheet: "pr_records" | "body_weight"): Promise<string> {
+  const url = "https://docs.google.com/spreadsheets/d/" + SPREADSHEET_ID +
+    "/gviz/tq?tqx=out:json&sheet=" + encodeURIComponent(sheet);
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(sheet + " の取得に失敗しました (HTTP " + response.status + ")");
   }
-  return { prRecords, bodyWeightRecords };
+  return response.text();
 }
 
-async function fetchSheet(sheet?: string): Promise<string> {
-  const address = "https://docs.google.com/spreadsheets/d/" + SPREADSHEET_ID +
-    "/gviz/tq?tqx=out:json" + (sheet ? "&sheet=" + encodeURIComponent(sheet) : "");
-  const result = await fetch(address);
-  if (!result.ok) throw new Error("HTTP " + result.status + ": " + result.statusText);
-  return result.text();
-}
-
-/**
- * Switch only when BOTH new sheets are readable and at least one contains data.
- * Until then, read the original first sheet (read-only and no data mutation).
- */
 export async function fetchTrainingData(): Promise<TrainingData> {
-  let reason = "";
+  const [prResponse, weightResponse] = await Promise.all([
+    fetchSheet("pr_records"),
+    fetchSheet("body_weight"),
+  ]);
   try {
-    const [pr, weight] = await Promise.all([fetchSheet("pr_records"), fetchSheet("body_weight")]);
-    const prRecords = parsePrSheet(pr);
-    const bodyWeightRecords = parseBodyWeightSheet(weight);
-    if (prRecords.length || bodyWeightRecords.length) {
-      return { prRecords, bodyWeightRecords, source: "split", warnings: [] };
-    }
-    reason = "新形式のシートが空のため旧形式を表示しています。";
-  } catch (error) {
-    reason = "新形式の2シートが未準備です（" +
-      (error instanceof Error ? error.message : String(error)) + "）。";
-  }
-  try {
-    const legacy = convertLegacy(parseGvizResponse(await fetchSheet()));
     return {
-      ...legacy, source: "legacy",
-      warnings: [reason, "旧形式からの暫定読み込みです。移行後は2シートを使用します。"],
+      prRecords: parsePrSheet(prResponse),
+      bodyWeightRecords: parseBodyWeightSheet(weightResponse),
     };
   } catch (error) {
-    throw new Error("新形式と旧形式の両方から取得できません: " +
+    throw new Error("スプレッドシートの形式を確認してください: " +
       (error instanceof Error ? error.message : String(error)));
   }
 }
