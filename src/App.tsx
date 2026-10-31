@@ -73,11 +73,13 @@ function App() {
             <h1 id="page-title">精進の記録 <span>BIG3</span></h1>
             <p className="hero-description">ベンチプレス・スクワット・デッドリフトの1RM自己ベスト記録</p>
           </div>
-          <div className="hero-aside">
-            <span className="eyebrow">LATEST ENTRY</span>
-            <strong>{formatDay(summary.latestDate)}</strong>
-            <small><a href={`https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/edit`}
-              target="_blank" rel="noopener noreferrer">Google Sheets の記録から表示</a></small>
+          <div className="data-timestamp" aria-label="トレーニングの最終記録">
+            <span className="data-timestamp__label">LATEST DATA</span>
+            <strong className="data-timestamp__value">{formatDay(summary.latestDate)}</strong>
+            <span className="data-timestamp__detail">
+              <a href={`https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/edit`}
+                target="_blank" rel="noopener noreferrer">Google Sheets の記録から表示</a>
+            </span>
           </div>
         </section>
 
