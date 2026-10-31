@@ -59,10 +59,11 @@ jobs:
           pnpm install --frozen-lockfile
           pnpm build
 
-      - name: Build preview
+      - name: Test and build preview
         working-directory: preview
         run: |
           pnpm install --frozen-lockfile
+          pnpm test
           pnpm exec tsc -b
           pnpm exec vite build --base=/big3-record/develop/
 
