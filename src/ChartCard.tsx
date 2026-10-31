@@ -59,7 +59,7 @@ export function ChartCard({ title, dataKey, color, history, weights, ratioMode }
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={points} margin={{ top: 8, right: 10, left: -8, bottom: 5 }}>
               <CartesianGrid stroke="#2a374b" strokeDasharray="3 5" vertical={false} />
-              <XAxis dataKey="date" tickFormatter={dateLabel} tick={{ fill: "#8192ab", fontSize: 11 }}
+              <XAxis dataKey="date" type="number" scale="time" domain={["dataMin", "dataMax"]} tickFormatter={dateLabel} tick={{ fill: "#8192ab", fontSize: 11 }}
                 axisLine={false} tickLine={false} minTickGap={25} />
               <YAxis domain={[min, max]} tickCount={5} width={50}
                 tick={{ fill: "#8192ab", fontSize: 11 }}
@@ -69,7 +69,7 @@ export function ChartCard({ title, dataKey, color, history, weights, ratioMode }
                 formatter={(value: number, name: string) => formatTooltip(value, name)}
                 contentStyle={{ background: "#152136", border: "1px solid #34445a", borderRadius: 10, color: "#eaf0f8" }}
                 itemStyle={{ color: "#eaf0f8" }} />
-              <Line type="stepAfter" dataKey="value" stroke={color} strokeWidth={2.5}
+              <Line type={isBodyWeight ? "monotone" : "stepAfter"} dataKey="value" stroke={color} strokeWidth={2.5}
                 dot={points.length <= 1} activeDot={{ r: 4 }}
                 connectNulls={false} isAnimationActive={false} name="value" />
               {isBodyWeight && (

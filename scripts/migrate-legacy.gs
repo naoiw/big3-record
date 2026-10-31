@@ -58,12 +58,16 @@ function migrateLegacyBig3() {
 
   const prSheet = book.insertSheet("pr_records");
   const bodySheet = book.insertSheet("body_weight");
-  prSheet.getRange("A:A").setNumberFormat("@"); // Keep ISO calendar date text.
-  bodySheet.getRange("A:A").setNumberFormat("@");
+  prSheet.getRange("A:A").setNumberFormat("yyyy/mm/dd");
+  bodySheet.getRange("A:A").setNumberFormat("yyyy/mm/dd");
   prSheet.getRange(1, 1, 1, 3).setValues([["date", "exercise", "weight_kg"]]);
   bodySheet.getRange(1, 1, 1, 2).setValues([["date", "weight_kg"]]);
-  if (pr.length) prSheet.getRange(2, 1, pr.length, 3).setValues(pr);
-  if (bodyRows.length) bodySheet.getRange(2, 1, bodyRows.length, 2).setValues(bodyRows);
+  // Use real Google Sheets date cells so date-only validation also works.
+  const dateCell = date => Utilities.parseDate(date, timezone, "yyyy-MM-dd");
+  if (pr.length) prSheet.getRange(2, 1, pr.length, 3).setValues(
+    pr.map(([date, exercise, kg]) => [dateCell(date), exercise, kg]));
+  if (bodyRows.length) bodySheet.getRange(2, 1, bodyRows.length, 2).setValues(
+    bodyRows.map(([date, kg]) => [dateCell(date), kg]));
   prSheet.setFrozenRows(1);
   bodySheet.setFrozenRows(1);
   SpreadsheetApp.flush();
