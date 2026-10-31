@@ -1,63 +1,38 @@
 # 開発手順
 
-## 環境と起動
+## 起動・検証
 
 Node.js 20 / pnpm 9 を使用します。
 
-```bash
+~~~bash
 corepack enable
 pnpm install --frozen-lockfile
 pnpm dev
 pnpm test
 pnpm build
-```
+~~~
 
-`pnpm test`は計算・シート読み取り用TypeScriptを`tests/dist/`にCommonJSとして一時コンパイルし、Node標準のテストランナーで検証します。`tests/dist/`と`*.tsbuildinfo`はGit管理対象外です。
+テストでは集計・日付・gvizパースを一時コンパイルし、Node標準テストランナーで検証します。生成物はGit管理外です。
 
 ## ブランチ運用
 
-1. **実装と修正は`develop`**。通常`main`を直接更新しません。
-2. `develop`へのpushでビルド検証を実施し、成功したコミットを開発プレビューへ自動デプロイします。
-3. `main`へ取り込むときは**`develop` → `main`のPull Request**を作成し、CIを確認します。
-4. マージ後も`develop`を削除せず、`main`の変更を取り込んで同期します。
+1. 開発は **develop**、mainは本番。
+2. developへのpushでテストとビルド。成功した版をプレビューへデプロイ。
+3. 本番反映は **develop → mainのPull Request** 経由で行います。
+4. マージ後もdevelopを残し、mainから同期して次の開発を続けます。
 
-```bash
-git switch develop
-git pull origin develop
-# 実装・動作確認
-pnpm test
-pnpm build
-git add .
-git commit -m "refactor: update dashboard"
-git push origin develop
-# GitHubで develop → main のPRを作成
-```
+## 責務の分離
 
-マージ後の同期：
-
-```bash
-git switch develop
-git fetch origin
-git merge origin/main
-git push origin develop
-```
-
-## コードの責務
-
-| ファイル | 担当 |
+| パス | 役割 |
 | --- | --- |
-| `src/App.tsx` | UI、データ取得状態、表示切り替え |
-| `src/ChartCard.tsx` | グラフの描画 |
-| `src/metrics.ts` | 日付順・補完・自己ベスト・体重比・期間抽出 |
-| `src/timeRange.ts` | 日時文字列の解釈 |
-| `src/sheetApi.ts` | gviz取得・数値/日時セル変換 |
-| `src/index.css` | 画面スタイル、画面幅への対応 |
-| `tests/` | 集計と入力パースの回帰テスト |
+| src/sheetApi.ts | 2タブのgviz読み取り・旧形式フォールバック |
+| src/timeRange.ts | 日本の暦日キー・日時検証 |
+| src/metrics.ts | 自己ベスト・達成日・体重比・7日平均・集計 |
+| src/App.tsx | データ取得、サマリー、切り替えUI、警告 |
+| src/ChartCard.tsx | PB推移・体重および平均体重のグラフ |
+| tests/ | データ正規化・集計・入力パースの回帰テスト |
+| scripts/migrate-legacy.gs | 任意実行する一度限りの移行補助 |
 
-データの正規化や集計に関する変更はReactコンポーネントへ直接追加せず、`metrics.ts`または`sheetApi.ts`に実装します。日時の境界、欠損値、初回記録の扱いはテストでも確認します。
+詳細は [SPEC.md](SPEC.md) を、スプレッドシート側の作業は [MIGRATION.md](MIGRATION.md) を、デプロイ構成は [DEPLOYMENT.md](DEPLOYMENT.md) を参照してください。
 
-## CI
-
-`validate-develop.yml`はdevelop pushまたはmain/develop向けPRでテストとビルドを実行します。`deploy_pages.yml`はmain側で起動し、mainと検証済みdevelopの両方を同じPagesアーティファクトへ統合します。
-
-公開の詳細は[DEPLOYMENT.md](DEPLOYMENT.md)を参照してください。
+**Sheetsのデータ移行はGitHubへのpushでは実行されません。** バックアップ・照合が完了するまでmainにはマージしないでください。
