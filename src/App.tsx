@@ -206,7 +206,7 @@ function App() {
       </main>
 
       <footer className="page-footer"><span>BIG3 RECORD</span>
-        <a href="https://github.com/naoiw/big3-record" target="_blank" rel="noopener noreferrer">GitHub</a>
+        <a href="https://github.com/naoiw/big3-record" target="_blank" rel="noopener noreferrer" aria-label="GitHubでソースコードを開く">GitHub ↗</a>
       </footer>
     </div>
   );
