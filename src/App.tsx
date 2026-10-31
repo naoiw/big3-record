@@ -52,6 +52,7 @@ function App() {
   const weights = useMemo(() => filterByRange(summary.weights, range, summary.latestDate),
     [summary, range]);
   const best = summary.best;
+  const recordedLifts = LIFTS.filter(lift => best[lift.key] !== null);
   const latestWeight = summary.latestWeight;
   const displayBest = (key: LiftKey | "total") =>
     ratioMode ? toBodyWeightRatio(best[key], latestWeight?.weightKg ?? null) : best[key];
@@ -134,11 +135,11 @@ function App() {
                 <article className="metric-card metric-total" data-tone="total">
                   <div className="metric-top"><span className="metric-name">TOTAL</span>
                     <span className="metric-symbol" aria-hidden="true">Σ</span></div>
-                  <p className="metric-description">3種目の歴代自己ベスト合計</p>
+                  <p className="metric-description">記録済み種目の自己ベスト合計</p>
                   <p className="metric-reading"><strong>{formatNumber(displayBest("total"), ratioMode)}</strong>
                     <span>{ratioMode ? "倍" : "kg"}</span></p>
                   <div className="metric-rule" />
-                  <p className="records-date">異なる日の自己ベストを合算</p>
+                  <p className="records-date">未記録の種目は合計対象外</p>
                 </article>
               </div>
             </section>
@@ -155,8 +156,8 @@ function App() {
                 <span className="eyebrow">PERSONAL BEST COMPOSITION</span>
                 {best.total !== null && best.total > 0 ? (
                   <>
-                    <div className="composition" aria-label="3種目の自己ベスト重量比">
-                      {LIFTS.map(lift => (
+                    <div className="composition" aria-label="記録済み種目の自己ベスト重量比">
+                      {recordedLifts.map(lift => (
                         <div key={lift.key} className={"composition-" + lift.key}
                           style={{ width: ((best[lift.key] ?? 0) / best.total! * 100) + "%" }}
                           title={lift.abbreviation + ": " +
@@ -164,13 +165,13 @@ function App() {
                       ))}
                     </div>
                     <div className="composition-legend">
-                      {LIFTS.map(lift => (
+                      {recordedLifts.map(lift => (
                         <span key={lift.key}><i className={"legend-dot dot-" + lift.key} />
                           {lift.abbreviation} {((best[lift.key] ?? 0) / best.total! * 100).toFixed(1)}%</span>
                       ))}
                     </div>
                   </>
-                ) : <p className="section-note">3種目が揃うと内訳を表示します。</p>}
+                ) : <p className="section-note">1種目以上の自己ベストを記録すると内訳を表示します。</p>}
               </div>
             </section>
 

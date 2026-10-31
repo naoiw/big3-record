@@ -3,7 +3,7 @@ const assert = require("node:assert/strict");
 const { prepareTraining, toBodyWeightRatio, filterByRange } = require("./dist/metrics.js");
 const { toDayKey, dayNumber } = require("./dist/timeRange.js");
 
-test("PR events are progressive, independent and cumulative; missing lifts block Total", () => {
+test("PR events are progressive, independent and cumulative with partial Total", () => {
   const data = prepareTraining([
     { date: "2026-09-15", exercise: "BP", weightKg: 115 },
     { date: "2026-09-01", exercise: "BP", weightKg: 110 },
@@ -11,11 +11,44 @@ test("PR events are progressive, independent and cumulative; missing lifts block
     { date: "2026-09-27", exercise: "DL", weightKg: 170 },
     { date: "2026-10-01", exercise: "SQ", weightKg: 120 },
   ], []);
-  assert.equal(data.history[0].total, null);
+  assert.deepEqual(data.history.map(point => point.total), [110, 270, 275, 285, 405]);
   assert.equal(data.history.at(-1).total, 405);
   assert.deepEqual(data.best, { bp: 115, sq: 120, dl: 170, total: 405 });
   assert.deepEqual(data.achieved, { bp: "2026-09-15", sq: "2026-10-01", dl: "2026-09-27" });
   assert.equal(data.history[2].bp, 115);
+});
+
+
+test("Total includes one or two recorded lifts without fabricating missing PBs", () => {
+  const onlyBP = prepareTraining([
+    { date: "2026-01-01", exercise: "BP", weightKg: 100 },
+    { date: "2026-01-15", exercise: "BP", weightKg: 105 },
+  ], [{ date: "2026-01-01", weightKg: 80 }]);
+  assert.deepEqual(onlyBP.best, { bp: 105, sq: null, dl: null, total: 105 });
+  assert.deepEqual(onlyBP.history.map(point => point.total), [100, 105]);
+
+  const twoLifts = prepareTraining([
+    { date: "2026-01-01", exercise: "BP", weightKg: 100 },
+    { date: "2026-01-02", exercise: "DL", weightKg: 150 },
+  ], []);
+  assert.deepEqual(twoLifts.best, { bp: 100, sq: null, dl: 150, total: 250 });
+  assert.equal(twoLifts.history[0].total, 100);
+  assert.equal(twoLifts.history[1].total, 250);
+  assert.equal(toBodyWeightRatio(twoLifts.best.total, 80), 3.13);
+});
+
+test("Total is unavailable when there are no valid lift records", () => {
+  const bodyOnly = prepareTraining([], [{ date: "2026-01-01", weightKg: 80 }]);
+  assert.equal(bodyOnly.best.total, null);
+  assert.equal(bodyOnly.history[0].total, null);
+
+  const invalid = prepareTraining([
+    { date: "2026-01-01", exercise: "BP", weightKg: -50 },
+    { date: "2026-01-02", exercise: "XX", weightKg: 100 },
+  ], []);
+  assert.equal(invalid.best.total, null);
+  assert.equal(invalid.history.length, 0);
+  assert.equal(invalid.warnings.length, 2);
 });
 
 test("duplicate dates, invalid values and non-increasing PB are warned, not applied", () => {
