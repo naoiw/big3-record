@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { ChartCard } from "./ChartCard";
-import { fetchTrainingData, type TrainingData } from "./sheetApi";
+import { fetchTrainingData, SPREADSHEET_ID, type TrainingData } from "./sheetApi";
 import {
   filterByRange, prepareTraining, toBodyWeightRatio,
   type HistoryRange, type LiftKey,
@@ -76,7 +76,8 @@ function App() {
           <div className="hero-aside">
             <span className="eyebrow">LATEST ENTRY</span>
             <strong>{formatDay(summary.latestDate)}</strong>
-            <small>Google Sheets の記録から表示</small>
+            <small><a href={`https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/edit`}
+              target="_blank" rel="noopener noreferrer">Google Sheets の記録から表示</a></small>
           </div>
         </section>
 
@@ -138,7 +139,7 @@ function App() {
                   <p className="metric-reading"><strong>{formatNumber(displayBest("total"), ratioMode)}</strong>
                     <span>{ratioMode ? "倍" : "kg"}</span></p>
                   <div className="metric-rule" />
-                  <p className="records-date">異なる日の自己ベストを合算</p>
+                  <p className="records-date">3種目の自己ベストを合算</p>
                 </article>
               </div>
             </section>
