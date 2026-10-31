@@ -13,6 +13,14 @@ export function dayNumber(day: string): number {
 
 export function toDayKey(value: string): string | null {
   const text = String(value ?? "").trim();
+  // Explicitly zoned timestamps are instants, unlike plain calendar dates.
+  if (/^\d{4}[-/]\d{1,2}[-/]\d{1,2}T.*(?:Z|[+-]\d{2}:?\d{2})$/i.test(text)) {
+    const instant = new Date(text);
+    if (Number.isNaN(instant.getTime())) return null;
+    return new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Tokyo", year: "numeric", month: "2-digit", day: "2-digit",
+    }).format(instant);
+  }
   const match = /^(\d{4})[-/](\d{1,2})[-/](\d{1,2})(?=$|[ T])/.exec(text);
   if (match) {
     const key = match[1] + "-" + match[2].padStart(2, "0") + "-" + match[3].padStart(2, "0");

@@ -77,4 +77,5 @@ test("JST date normalization validates calendar dates", () => {
   assert.ok(Number.isFinite(dayNumber("2026-02-28")));
   assert.ok(Number.isNaN(dayNumber("2026-02-31")));
   assert.equal(toDayKey("1761922800"), "2025-11-01");
+  assert.equal(toDayKey("2025-10-31T15:00:00.000Z"), "2025-11-01");
 });

@@ -132,8 +132,11 @@ export function filterByRange<T extends { day: string }>(
 ): T[] {
   if (range === "all" || !latestDay) return points;
   const [year, month, day] = latestDay.split("-").map(Number);
-  const cutoff = new Date(Date.UTC(year, month - 1, day));
-  cutoff.setUTCMonth(cutoff.getUTCMonth() - (range === "6m" ? 6 : 12));
-  const start = cutoff.toISOString().slice(0, 10);
+  const monthIndex = year * 12 + month - 1 - (range === "6m" ? 6 : 12);
+  const targetYear = Math.floor(monthIndex / 12);
+  const targetMonth = monthIndex - targetYear * 12;
+  const maxDay = new Date(Date.UTC(targetYear, targetMonth + 1, 0)).getUTCDate();
+  const start = new Date(Date.UTC(targetYear, targetMonth, Math.min(day, maxDay)))
+    .toISOString().slice(0, 10);
   return points.filter(point => point.day >= start);
 }
