@@ -102,3 +102,12 @@ h1 span { color: #89a1bf; font-weight: 500; }
   .chart-plot, .chart-empty { height: 235px; }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; scroll-behavior: auto !important; } }
+
+/* Record dates and body-weight trends */
+.records-date { margin: 13px 0 0; color: #8fa2bb; font-size: .74rem; }
+.overview-average { margin-top: 3px; color: #a8c6bb; font-size: .83rem; font-variant-numeric: tabular-nums; }
+.source-notice { margin: -8px 0 21px; padding: 12px 15px; font-size: .82rem; color: #b5c9e1; background: #182a3d; border: 1px solid #33506c; border-radius: 11px; line-height: 1.6; }
+.source-notice a { margin-left: 10px; color: #86d9c0; }
+.warnings { margin: -8px 0 20px; padding: 12px 16px; background: #282632; border: 1px solid #62546c; border-radius: 11px; font-size: .8rem; color: #e4cadf; }
+.warnings summary { cursor: pointer; font-weight: 600; }
+.warnings li { margin-top: 6px; overflow-wrap: anywhere; }

@@ -28,7 +28,7 @@ export function ChartCard({ title, dataKey, color, history, weights, ratioMode }
     }))
     : history.map(point => ({
       date: point.date,
-      value: useRatio ? toBodyWeightRatio(point[dataKey], point.weightForRatio) : point[dataKey],
+      value: useRatio ? toBodyWeightRatio(point[dataKey as Exclude<MetricKey, "bodyWeight">], point.weightForRatio) : point[dataKey as Exclude<MetricKey, "bodyWeight">],
       avg7: null,
     })), [dataKey, history, weights, isBodyWeight, useRatio]);
 

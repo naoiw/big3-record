@@ -121,8 +121,8 @@ export function prepareTraining(prRecords: PrRecord[], bodyWeightRecords: BodyWe
 
   return {
     history, weights, best: { ...best }, achieved,
-    latestWeight: weights.at(-1) ?? null,
-    latestDate: days.at(-1) ?? null, warnings,
+    latestWeight: weights.length ? weights[weights.length - 1] : null,
+    latestDate: days.length ? days[days.length - 1] : null, warnings,
   };
 }
 
