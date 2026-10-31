@@ -1,86 +1,139 @@
-import type { LogRow } from "./sheetApi";
-import { parseTimestamp } from "./timeRange";
+import type { BodyWeightRecord, Exercise, PrRecord } from "./sheetApi";
+import { dayNumber, toDayKey } from "./timeRange";
 
 export type LiftKey = "bp" | "sq" | "dl";
 export type MetricKey = LiftKey | "total" | "bodyWeight";
 export type HistoryRange = "all" | "12m" | "6m";
+export type BestStats = Record<LiftKey | "total", number | null>;
 
 export interface HistoryPoint {
-  timestamp: string;
-  date: Date;
-  bp: number | null;
-  sq: number | null;
-  dl: number | null;
-  bodyWeight: number | null;
-  total: number | null;
-}
-
-export interface BestStats {
+  day: string;
+  date: number;
   bp: number | null;
   sq: number | null;
   dl: number | null;
   total: number | null;
+  /** Most recent body weight at this date, if measured within the preceding 7 days. */
+  weightForRatio: number | null;
+}
+export interface WeightPoint {
+  day: string;
+  date: number;
+  weightKg: number;
+  avg7: number;
+}
+export interface TrainingSummary {
+  history: HistoryPoint[];
+  weights: WeightPoint[];
+  best: BestStats;
+  achieved: Record<LiftKey, string | null>;
+  latestDate: string | null;
+  latestWeight: WeightPoint | null;
+  warnings: string[];
 }
 
-function validWeight(value: number | null): number | null {
-  return value != null && Number.isFinite(value) && value > 0 ? value : null;
+const EXERCISE: Record<Exercise, LiftKey> = { BP: "bp", SQ: "sq", DL: "dl" };
+const LIFTS: LiftKey[] = ["bp", "sq", "dl"];
+
+function validPositive(value: number): boolean {
+  return Number.isFinite(value) && value > 0;
 }
 
-/** Sort chronologically; carry the last recorded value forward independently for each metric. */
-export function prepareHistory(rows: LogRow[]): HistoryPoint[] {
-  const sorted = rows
-    .map((row) => ({ row, date: parseTimestamp(row.timestamp) }))
-    .filter((item): item is { row: LogRow; date: Date } => item.date !== null)
-    .sort((a, b) => a.date.getTime() - b.date.getTime());
-
-  let bp: number | null = null;
-  let sq: number | null = null;
-  let dl: number | null = null;
-  let bodyWeight: number | null = null;
-
-  return sorted.map(({ row, date }) => {
-    bp = validWeight(row.bp) ?? bp;
-    sq = validWeight(row.sq) ?? sq;
-    dl = validWeight(row.dl) ?? dl;
-    bodyWeight = validWeight(row.bodyWeight) ?? bodyWeight;
-    const total = bp !== null && sq !== null && dl !== null
-      ? Math.round((bp + sq + dl) * 10) / 10
-      : null;
-    return { timestamp: row.timestamp, date, bp, sq, dl, bodyWeight, total };
-  });
-}
-
-/** The combined PB is the sum of independent exercise maxima, not necessarily one session. */
-export function getBestStats(history: HistoryPoint[]): BestStats {
-  const max = (key: LiftKey): number | null => {
-    const values = history.map((row) => row[key]).filter((n): n is number => n !== null);
-    return values.length ? Math.max(...values) : null;
-  };
-  const bp = max("bp");
-  const sq = max("sq");
-  const dl = max("dl");
-  return {
-    bp, sq, dl,
-    total: bp !== null && sq !== null && dl !== null
-      ? Math.round((bp + sq + dl) * 10) / 10
-      : null,
-  };
+function round(value: number, digits = 2): number {
+  const factor = 10 ** digits;
+  return Math.round((value + Number.EPSILON) * factor) / factor;
 }
 
 export function toBodyWeightRatio(value: number | null, weight: number | null): number | null {
-  if (value === null || weight === null || weight <= 0) return null;
-  return Math.round((value / weight) * 100) / 100;
+  return value !== null && weight !== null && validPositive(weight)
+    ? round(value / weight) : null;
 }
 
-/** Relative to the newest record, not to today's date (historical logs remain viewable). */
-export function filterHistory(history: HistoryPoint[], range: HistoryRange): HistoryPoint[] {
-  if (range === "all" || history.length === 0) return history;
-  const newest = history[history.length - 1].date;
-  const cutoff = new Date(newest);
-  cutoff.setMonth(cutoff.getMonth() - (range === "6m" ? 6 : 12));
-  return history.filter((point) => point.date.getTime() >= cutoff.getTime());
+/** Each day may contain multiple lifts but only one record per lift. */
+export function prepareTraining(prRecords: PrRecord[], bodyWeightRecords: BodyWeightRecord[]): TrainingSummary {
+  const warnings: string[] = [];
+  const prByDay = new Map<string, Partial<Record<LiftKey, number>>>();
+  const weightByDay = new Map<string, number>();
+
+  for (const entry of prRecords) {
+    const day = toDayKey(entry.date);
+    const lift = EXERCISE[entry.exercise];
+    if (!day || !lift || !validPositive(entry.weightKg)) {
+      warnings.push("不正なPR記録を除外しました: " + String(entry.date) + " " + String(entry.exercise));
+      continue;
+    }
+    const values = prByDay.get(day) ?? {};
+    if (values[lift] !== undefined) {
+      warnings.push(day + " の " + entry.exercise + " が重複しています（高い記録を使用）。");
+    }
+    values[lift] = Math.max(values[lift] ?? 0, entry.weightKg);
+    prByDay.set(day, values);
+  }
+  for (const entry of bodyWeightRecords) {
+    const day = toDayKey(entry.date);
+    if (!day || !validPositive(entry.weightKg)) {
+      warnings.push("不正な体重記録を除外しました: " + String(entry.date));
+      continue;
+    }
+    if (weightByDay.has(day)) warnings.push(day + " の体重記録が重複しています（最後の値を使用）。");
+    weightByDay.set(day, entry.weightKg);
+  }
+
+  const weightDays = [...weightByDay.keys()].sort();
+  const weights: WeightPoint[] = weightDays.map(day => {
+    const start = dayNumber(day) - 6;
+    const recent = weightDays
+      .filter(other => dayNumber(other) >= start && other <= day)
+      .map(other => weightByDay.get(other)!);
+    return {
+      day, date: dayNumber(day) * 86400000, weightKg: weightByDay.get(day)!,
+      avg7: round(recent.reduce((a, b) => a + b, 0) / recent.length),
+    };
+  });
+
+  const best: BestStats = { bp: null, sq: null, dl: null, total: null };
+  const achieved: Record<LiftKey, string | null> = { bp: null, sq: null, dl: null };
+  const history: HistoryPoint[] = [];
+  const days = [...new Set([...prByDay.keys(), ...weightDays])].sort();
+  let weightIndex = -1;
+  for (const day of days) {
+    const atDay = prByDay.get(day);
+    if (atDay) {
+      for (const lift of LIFTS) {
+        const submitted = atDay[lift];
+        if (submitted === undefined) continue;
+        if (best[lift] !== null && submitted <= best[lift]) {
+          warnings.push(day + " の " + lift.toUpperCase() + " は前回のPR以下のため除外しました。");
+        } else {
+          best[lift] = submitted;
+          achieved[lift] = day;
+        }
+      }
+    }
+    while (weightIndex + 1 < weights.length && weights[weightIndex + 1].day <= day) weightIndex++;
+    const currentWeight = weightIndex >= 0 ? weights[weightIndex] : null;
+    const age = currentWeight ? dayNumber(day) - dayNumber(currentWeight.day) : Infinity;
+    const weightForRatio = currentWeight && age >= 0 && age <= 7 ? currentWeight.weightKg : null;
+    best.total = LIFTS.every(lift => best[lift] !== null)
+      ? round(best.bp! + best.sq! + best.dl!, 1) : null;
+    history.push({ day, date: dayNumber(day) * 86400000, ...best, weightForRatio });
+  }
+
+  return {
+    history, weights, best: { ...best }, achieved,
+    latestWeight: weights.at(-1) ?? null,
+    latestDate: days.at(-1) ?? null, warnings,
+  };
 }
 
-export function formatDate(date: Date | null): string {
-  return date ? date.toLocaleDateString("ja-JP", { year: "numeric", month: "long", day: "numeric" }) : "—";
+/** Time range relative to the newest entry (PR or body weight). */
+export function filterByRange<T extends { day: string }>(
+  points: T[], range: HistoryRange, latestDay: string | null,
+): T[] {
+  if (range === "all" || !latestDay) return points;
+  const [year, month, day] = latestDay.split("-").map(Number);
+  const cutoff = new Date(Date.UTC(year, month - 1, day));
+  cutoff.setUTCMonth(cutoff.getUTCMonth() - (range === "6m" ? 6 : 12));
+  const start = cutoff.toISOString().slice(0, 10);
+  return points.filter(point => point.day >= start);
 }

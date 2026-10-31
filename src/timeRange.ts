@@ -1,22 +1,35 @@
-/**
- * スプレッドシートのタイムスタンプ文字列を Date にパースする。
- * UNIX秒（数値文字列）・ISO・"YYYY/MM/DD" 形式に対応。パースできない場合は null。
- */
-export function parseTimestamp(ts: string): Date | null {
-  if (!ts || typeof ts !== "string") return null;
-  const trimmed = ts.trim();
-  if (!trimmed) return null;
-  // UNIX秒（10桁）またはミリ秒（13桁）の数値文字列
-  const num = Number(trimmed);
-  if (Number.isFinite(num) && num >= 1e9 && num < 1e15) {
-    const ms = num < 1e12 ? num * 1000 : num;
-    const d = new Date(ms);
-    return Number.isNaN(d.getTime()) ? null : d;
+/** Calendar dates in the sheet are JST civil dates, not instants. */
+export function dayNumber(day: string): number {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(day);
+  if (!match) return NaN;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const date = Number(match[3]);
+  const result = Date.UTC(year, month - 1, date);
+  const check = new Date(result);
+  return check.getUTCFullYear() === year && check.getUTCMonth() === month - 1 &&
+    check.getUTCDate() === date ? result / 86400000 : NaN;
+}
+
+export function toDayKey(value: string): string | null {
+  const text = String(value ?? "").trim();
+  const match = /^(\d{4})[-/](\d{1,2})[-/](\d{1,2})(?=$|[ T])/.exec(text);
+  if (match) {
+    const key = match[1] + "-" + match[2].padStart(2, "0") + "-" + match[3].padStart(2, "0");
+    return Number.isFinite(dayNumber(key)) ? key : null;
   }
-  // ISO / スラッシュ形式などに対応
-  let d = new Date(trimmed);
-  if (!Number.isNaN(d.getTime())) return d;
-  // "YYYY/MM/DD HH:MM" など
-  d = new Date(trimmed.replace(/\//g, "-"));
-  return Number.isNaN(d.getTime()) ? null : d;
+  if (!text) return null;
+  const unix = Number(text);
+  const parsed = Number.isFinite(unix) && unix >= 1e9 && unix < 1e15
+    ? new Date(unix < 1e12 ? unix * 1000 : unix)
+    : new Date(text);
+  if (Number.isNaN(parsed.getTime())) return null;
+  // Date-time timestamps are converted to Japan's local calendar date.
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Tokyo", year: "numeric", month: "2-digit", day: "2-digit",
+  }).format(parsed);
+}
+
+export function formatDay(day: string | null): string {
+  return day ? day.replace(/-/g, "/") : "—";
 }
