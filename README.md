@@ -30,12 +30,12 @@
 
 ## 技術スタック
 
-TypeScript / React 18 / Recharts / Vite / Google Sheets gviz / Node.js 20 / pnpm 9 / GitHub Actions・Pages
+TypeScript / React 18 / Recharts / Vite / Google Sheets gviz / Node.js 26 / pnpm 9 / GitHub Actions・Pages
 
 ## ローカル開発
 
 ~~~bash
-corepack enable
+npm install --global pnpm@9.14.2
 pnpm install --frozen-lockfile
 pnpm dev
 pnpm test
